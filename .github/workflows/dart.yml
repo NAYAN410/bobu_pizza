@@ -1,38 +1,33 @@
-name: iOS-IPA-Build
+name: iOS-ipa-build
 
 on:
   workflow_dispatch:
 
 jobs:
   build-ios:
-    name: Build Unsigned IPA
-    runs-on: macos-14
+    name: 🎉 Unsigned iOS Build
+    runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          channel: 'stable'
+          architecture: x64
 
-      - name: Flutter Version
-        run: flutter --version
-
-      - name: Install Dependencies
+      - name: Flutter Pub Get
         run: flutter pub get
 
-      - name: Create GoogleService-Info.plist
+      - name: 🔑 Create GoogleService-Info.plist
         run: |
           echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
 
-      - name: Install CocoaPods
+      - name: Pod Repo Update
+        run: pod repo update
         working-directory: ios
-        run: |
-          pod install --repo-update
 
-      - name: Disable Code Signing
+      - name: 🔧 Disable Code Signing
         run: |
           sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
           sed -i '' 's/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
@@ -40,19 +35,13 @@ jobs:
           sed -i '' 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
           sed -i '' 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
 
-      - name: Clean Flutter Project
-        run: flutter clean
-
-      - name: Get Packages Again
-        run: flutter pub get
-
-      - name: Build Unsigned IPA
+      - name: 📦 Build Unsigned IPA
         run: |
           flutter build ipa --release --no-codesign \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+          --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Upload IPA Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-ios-ipa
