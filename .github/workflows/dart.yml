@@ -27,7 +27,6 @@ jobs:
         working-directory: ios
         run: |
           pod repo update
-          pod install
 
       - name: 🔧 Disable Code Signing
         run: |
