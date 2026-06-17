@@ -18,36 +18,36 @@ jobs:
           channel: 'stable'
           architecture: x64
 
-      - name: 📥 Install dependencies
+      - name: 📥 Flutter pub get
         run: flutter pub get
 
-      # ─── Google Services Setup ───────────────────────────────────────────────
+      # ─── Google Services Setup ────────────────────────────────────────────
       - name: 🔑 Create GoogleService-Info.plist
         run: |
           echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
 
-      # ─── Supabase env injection (via .env or dart-define) ────────────────────
-      - name: 🔐 Create .env file for Supabase
+      # ─── Supabase env injection ───────────────────────────────────────────
+      - name: 🔐 Inject Supabase secrets
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
 
-      # ─── CocoaPods ───────────────────────────────────────────────────────────
-      - name: 🍫 Install CocoaPods dependencies
+      # ─── CocoaPods ────────────────────────────────────────────────────────
+      - name: 🍫 Install CocoaPods & pod install
         run: |
           gem install cocoapods
           pod repo update
           pod install
         working-directory: ios
 
-      # ─── Build ───────────────────────────────────────────────────────────────
+      # ─── Build ───────────────────────────────────────────────────────────
       - name: 🔨 Build iOS (no codesign)
         run: |
           flutter build ios --release --no-codesign \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      # ─── Package IPA ─────────────────────────────────────────────────────────
+      # ─── Package IPA ─────────────────────────────────────────────────────
       - name: 📁 Create Payload folder
         run: mkdir Payload
         working-directory: build/ios/iphoneos
@@ -60,7 +60,7 @@ jobs:
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
 
-      # ─── Release ─────────────────────────────────────────────────────────────
+      # ─── Release ─────────────────────────────────────────────────────────
       - name: 🚀 Upload IPA to GitHub Release
         uses: svenstaro/upload-release-action@v2
         with:
