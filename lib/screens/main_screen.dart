@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants.dart';
+import '../services/cart_service.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/menu_tab.dart';
 import 'tabs/cart_tab.dart';
@@ -45,6 +46,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       systemNavigationBarColor: Colors.white,
       systemNavigationBarIconBrightness: Brightness.dark,
     ));
+    // Fetch cart on mount to ensure notifier has data
+    CartService.fetchCartFromDb();
   }
 
   @override
@@ -61,7 +64,86 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           ProfileTab(),
         ],
       ),
-      bottomNavigationBar: _buildNavBar(),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildMiniCartBar(),
+          _buildNavBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniCartBar() {
+    // 1. Check if we are NOT on the cart tab (index 2)
+    if (_selectedIndex == 2) return const SizedBox.shrink();
+
+    return ValueListenableBuilder(
+      valueListenable: CartService.cartItemsNotifier,
+      builder: (context, items, child) {
+        // 2. Check if cart has items
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        final int totalItems = items.fold(0, (sum, item) => sum + item.quantity);
+
+        return GestureDetector(
+          onTap: () => _onItemTapped(2), // Switch to cart tab
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.shopping_cart_outlined, 
+                      color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '$totalItems Item${totalItems > 1 ? 's' : ''} in cart',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      'View Cart',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_forward_ios, 
+                        color: Colors.white, size: 12),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
