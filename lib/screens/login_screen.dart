@@ -106,25 +106,38 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
+      // For iOS, you MUST provide the clientId if GoogleService-Info.plist is not in the project.
+      // The clientId below is derived from your Info.plist's REVERSED_CLIENT_ID.
       final googleSignIn = GoogleSignIn(
+        clientId: '474443519088-3druogolel6953mb25gkgcb4p3o2jnlo.apps.googleusercontent.com',
         serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
       );
+      
       await googleSignIn.signOut();
       final googleUser = await googleSignIn.signIn();
-      final googleAuth = await googleUser?.authentication;
-      final idToken = googleAuth?.idToken;
-      final accessToken = googleAuth?.accessToken;
+      
+      if (googleUser == null) {
+        setState(() => _isLoading = false);
+        return; // User cancelled
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+
       if (idToken == null) throw 'No ID Token found.';
+
       await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
       );
-      // Sync cart immediately after Google login
+
       await CartService.fetchCartFromDb();
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
-      if (mounted) _showSnack('Google sign-in failed', Colors.red);
+      debugPrint('Google Sign-In Error: $e');
+      if (mounted) _showSnack('Google sign-in failed: $e', Colors.red);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
