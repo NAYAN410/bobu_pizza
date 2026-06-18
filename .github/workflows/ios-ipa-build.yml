@@ -1,75 +1,43 @@
-name: iOS-ipa-build
+name: iOS Unsigned IPA Build
 
 on:
+  push:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  build-ios:
-    name: Build Unsigned iOS IPA
+  build:
+    name: Build Unsigned IPA
     runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
-          architecture: x64
+          channel: 'stable'
 
-      - name: Flutter Version
-        run: flutter --version
+      - name: Create .env file
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Create GoogleService-Info.plist
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Create IPA
         run: |
-          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
+          mkdir -p Payload
+          mv build/ios/iphoneos/Runner.app Payload/
+          zip -r BobuPizza.ipa Payload
 
-      - name: Install CocoaPods
-        run: |
-          cd ios
-          pod install --repo-update
-
-      - name: Disable iOS Code Signing
-        run: |
-          cd ios
-
-          sed -i '' 's/DevelopmentTeam = .*;/DevelopmentTeam = "";/g' Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = "";/g' Runner.xcodeproj/project.pbxproj
-
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' Runner.xcodeproj/project.pbxproj
-
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' Runner.xcodeproj/project.pbxproj
-
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' Runner.xcodeproj/project.pbxproj
-
-          sed -i '' 's/CODE_SIGN_IDENTITY = ".*"/CODE_SIGN_IDENTITY = ""/g' Runner.xcodeproj/project.pbxproj
-
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "";/g' Runner.xcodeproj/project.pbxproj
-
-      - name: Build Unsigned iOS App
-        run: |
-          flutter build ios --release --no-codesign \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-
-      - name: Create Payload Folder
-        run: mkdir -p Payload
-        working-directory: build/ios/iphoneos
-
-      - name: Copy Runner.app
-        run: cp -R Runner.app Payload
-        working-directory: build/ios/iphoneos
-
-      - name: Create IPA File
-        run: zip -r app.ipa Payload
-        working-directory: build/ios/iphoneos
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: unsigned-ios-ipa
-          path: build/ios/iphoneos/app.ipa
+          name: BobuPizza-Unsigned-IPA
+          path: BobuPizza.ipa
