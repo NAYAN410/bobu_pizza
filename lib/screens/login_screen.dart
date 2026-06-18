@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -106,8 +108,10 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
-      // For iOS, you MUST provide the clientId if GoogleService-Info.plist is not in the project.
-      // The clientId below is derived from your Info.plist's REVERSED_CLIENT_ID.
+      // 1. Generate a random nonce for security
+      final rawNonce = Supabase.instance.client.auth.generateRawNonce();
+      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+
       final googleSignIn = GoogleSignIn(
         clientId: '474443519088-3druogolel6953mb25gkgcb4p3o2jnlo.apps.googleusercontent.com',
         serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
@@ -118,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen>
       
       if (googleUser == null) {
         setState(() => _isLoading = false);
-        return; // User cancelled
+        return; 
       }
 
       final googleAuth = await googleUser.authentication;
@@ -127,10 +131,12 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (idToken == null) throw 'No ID Token found.';
 
+      // 2. Pass the raw nonce to Supabase
       await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
+        nonce: rawNonce, // This is crucial to fix the nonce error
       );
 
       await CartService.fetchCartFromDb();
