@@ -2,7 +2,8 @@ name: iOS Unsigned IPA Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -11,33 +12,59 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # Checkout repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      # Setup Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
 
+      # Show Flutter version
+      - name: Flutter Version
+        run: flutter --version
+
+      # Create .env file
       - name: Create .env file
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
           echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
 
-      - name: Install dependencies
+      # Install dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
+      # Clean old builds
+      - name: Flutter Clean
+        run: flutter clean
+
+      # Install CocoaPods
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      # Build iOS app without signing
       - name: Build iOS (No Codesign)
         run: flutter build ios --release --no-codesign
 
+      # Create IPA manually
       - name: Create IPA
         run: |
           mkdir -p Payload
-          mv build/ios/iphoneos/Runner.app Payload/
-          zip -r BobuPizza.ipa Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          cd Payload
+          zip -r ../BobuPizza.ipa .
+          cd ..
 
+      # Upload IPA artifact
       - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: BobuPizza-Unsigned-IPA
           path: BobuPizza.ipa
+          retention-days: 7
