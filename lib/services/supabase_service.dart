@@ -87,32 +87,88 @@ class SupabaseService {
     required String paymentMode,
     required double totalAmount,
     required List<Map<String, dynamic>> items,
+    String? couponId,
+    String? razorpayOrderId,
+    String? razorpayPaymentId,
+    String? paymentStatus,
   }) async {
     await checkConnectivity();
     final user = client.auth.currentUser;
     if (user == null) throw 'User not logged in';
 
+    // Generate Custom Order ID: BB20250810 + Random String
+    final now = DateTime.now();
+    final dateStr = "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}";
+    final randomStr = DateTime.now().millisecondsSinceEpoch.toString().substring(8);
+    final customOrderId = "BB$dateStr$randomStr";
+
     // 1. Insert order
-    final orderResponse = await client.from('orders').insert({
+    await client.from('orders').insert({
+      'id': customOrderId,
       'user_id': user.id,
       'address': address,
       'mobile': mobile,
       'payment_mode': paymentMode,
+      'payment_status': paymentStatus ?? (paymentMode == 'COD' ? 'pending' : 'completed'),
+      'razorpay_order_id': razorpayOrderId,
+      'razorpay_payment_id': razorpayPaymentId,
       'total_amount': totalAmount,
-      'status': 'pending',
-    }).select().single();
-
-    final orderId = orderResponse['id'];
+      'status': 'placed',
+      'coupon_id': couponId,
+    });
 
     // 2. Insert order items
     final orderItems = items.map((item) => {
-      'order_id': orderId,
+      'order_id': customOrderId,
       'pizza_id': item['pizza_id'],
       'quantity': item['quantity'],
       'price': item['price'],
     }).toList();
 
     await client.from('order_items').insert(orderItems);
+
+    // 3. Track coupon usage
+    if (couponId != null) {
+      await client.from('user_coupons').insert({
+        'user_id': user.id,
+        'coupon_id': couponId,
+      });
+    }
+  }
+
+  // Coupon Methods
+  static Future<Map<String, dynamic>?> validateCoupon(String code) async {
+    await checkConnectivity();
+    final user = client.auth.currentUser;
+    if (user == null) throw 'User not logged in';
+
+    // 1. Fetch coupon
+    final coupon = await client
+        .from('coupons')
+        .select()
+        .eq('code', code.toUpperCase())
+        .eq('is_active', true)
+        .maybeSingle();
+
+    if (coupon == null) return null;
+
+    // 2. Check expiry
+    if (coupon['expiry_date'] != null) {
+      final expiry = DateTime.parse(coupon['expiry_date']);
+      if (DateTime.now().isAfter(expiry)) return null;
+    }
+
+    // 3. Check if user already used it
+    final usage = await client
+        .from('user_coupons')
+        .select()
+        .eq('user_id', user.id)
+        .eq('coupon_id', coupon['id'])
+        .maybeSingle();
+
+    if (usage != null) throw 'You have already used this coupon';
+
+    return coupon;
   }
 
   // Address Methods
