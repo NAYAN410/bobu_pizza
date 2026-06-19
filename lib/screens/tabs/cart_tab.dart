@@ -16,15 +16,17 @@ class _CartTabState extends State<CartTab> {
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final double scale = (sw.clamp(0.0, 430.0) / 375).clamp(0.85, 1.1);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF8F0),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: ValueListenableBuilder<List<CartItem>>(
           valueListenable: CartService.cartItemsNotifier,
           builder: (context, cartItems, child) {
             if (cartItems.isEmpty) {
-              return _buildEmptyCart(scale);
+              return _buildEmptyCart(scale, isDark);
             }
             return Column(
               children: [
@@ -38,7 +40,7 @@ class _CartTabState extends State<CartTab> {
                         style: GoogleFonts.poppins(
                           fontSize: 24 * scale,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2D1A0E),
+                          color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                         ),
                       ),
                       SizedBox(width: 8 * scale),
@@ -67,12 +69,12 @@ class _CartTabState extends State<CartTab> {
                     padding: EdgeInsets.symmetric(horizontal: 16 * scale),
                     physics: const BouncingScrollPhysics(),
                     itemCount: cartItems.length,
-                    itemBuilder: (context, index) => _buildCartItem(cartItems[index], scale),
+                    itemBuilder: (context, index) => _buildCartItem(cartItems[index], scale, isDark),
                   ),
                 ),
 
                 // Checkout bar
-                _buildCheckoutBar(scale),
+                _buildCheckoutBar(scale, isDark),
               ],
             );
           },
@@ -81,7 +83,7 @@ class _CartTabState extends State<CartTab> {
     );
   }
 
-  Widget _buildEmptyCart(double scale) {
+  Widget _buildEmptyCart(double scale, bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -93,7 +95,7 @@ class _CartTabState extends State<CartTab> {
             style: GoogleFonts.poppins(
               fontSize: 20 * scale,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF2D1A0E),
+              color: isDark ? Colors.white : const Color(0xFF2D1A0E),
             ),
           ),
           SizedBox(height: 6 * scale),
@@ -101,7 +103,7 @@ class _CartTabState extends State<CartTab> {
             'Add some delicious pizzas!',
             style: GoogleFonts.poppins(
               fontSize: 13 * scale,
-              color: const Color(0xFF2D1A0E).withAlpha(115),
+              color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(115),
             ),
           ),
         ],
@@ -109,16 +111,16 @@ class _CartTabState extends State<CartTab> {
     );
   }
 
-  Widget _buildCartItem(CartItem item, double scale) {
+  Widget _buildCartItem(CartItem item, double scale, bool isDark) {
     final pizza = item.pizza;
     return Container(
       margin: EdgeInsets.only(bottom: 12 * scale),
       padding: EdgeInsets.all(12 * scale),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8D5C0), width: 1),
-        boxShadow: [
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: const Color(0xFF2D1A0E).withOpacity(0.05),
             blurRadius: 10,
@@ -133,7 +135,7 @@ class _CartTabState extends State<CartTab> {
             width: 64 * scale,
             height: 64 * scale,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF0DC),
+              color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -154,7 +156,7 @@ class _CartTabState extends State<CartTab> {
                   style: GoogleFonts.poppins(
                     fontSize: 13 * scale,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2D1A0E),
+                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -178,6 +180,7 @@ class _CartTabState extends State<CartTab> {
               _qtyButton(
                 icon: Icons.remove_rounded,
                 scale: scale,
+                isDark: isDark,
                 onTap: () => CartService.updateQuantity(pizza.id, -1),
               ),
               Padding(
@@ -187,13 +190,14 @@ class _CartTabState extends State<CartTab> {
                   style: GoogleFonts.poppins(
                     fontSize: 15 * scale,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2D1A0E),
+                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                   ),
                 ),
               ),
               _qtyButton(
                 icon: Icons.add_rounded,
                 scale: scale,
+                isDark: isDark,
                 filled: true,
                 onTap: () => CartService.updateQuantity(pizza.id, 1),
               ),
@@ -208,6 +212,7 @@ class _CartTabState extends State<CartTab> {
     required IconData icon,
     required double scale,
     required VoidCallback onTap,
+    required bool isDark,
     bool filled = false,
   }) {
     return GestureDetector(
@@ -216,7 +221,7 @@ class _CartTabState extends State<CartTab> {
         width: 28 * scale,
         height: 28 * scale,
         decoration: BoxDecoration(
-          color: filled ? AppColors.primary : const Color(0xFFFFF0DC),
+          color: filled ? AppColors.primary : (isDark ? Colors.white10 : const Color(0xFFFFF0DC)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
@@ -228,14 +233,14 @@ class _CartTabState extends State<CartTab> {
     );
   }
 
-  Widget _buildCheckoutBar(double scale) {
+  Widget _buildCheckoutBar(double scale, bool isDark) {
     return Container(
       padding: EdgeInsets.fromLTRB(20 * scale, 14 * scale, 20 * scale, 20 * scale), // Reduced bottom padding
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2D1A0E).withOpacity(0.08),
+            color: isDark ? Colors.black26 : const Color(0xFF2D1A0E).withOpacity(0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),

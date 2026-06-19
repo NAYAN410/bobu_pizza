@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../../services/cart_service.dart';
+import '../../services/theme_service.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
@@ -20,6 +21,8 @@ class ProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final double scale = (sw.clamp(0.0, 430.0) / 375).clamp(0.85, 1.1);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     final user = Supabase.instance.client.auth.currentUser;
     final String email = user?.email ?? 'guest@bobupizza.com';
@@ -30,7 +33,7 @@ class ProfileTab extends StatelessWidget {
         : 'BP';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF8F0),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -42,7 +45,7 @@ class ProfileTab extends StatelessWidget {
               SizedBox(height: 24 * scale),
 
               // Stats row
-              _buildStatsRow(scale),
+              _buildStatsRow(scale, theme, isDark),
 
               SizedBox(height: 24 * scale),
 
@@ -56,6 +59,8 @@ class ProfileTab extends StatelessWidget {
                 ],
                 scale,
                 context,
+                theme,
+                isDark,
               ),
 
               SizedBox(height: 16 * scale),
@@ -69,6 +74,8 @@ class ProfileTab extends StatelessWidget {
                 ],
                 scale,
                 context,
+                theme,
+                isDark,
               ),
 
               SizedBox(height: 16 * scale),
@@ -82,6 +89,8 @@ class ProfileTab extends StatelessWidget {
                 ],
                 scale,
                 context,
+                theme,
+                isDark,
               ),
 
               SizedBox(height: 16 * scale),
@@ -127,7 +136,7 @@ class ProfileTab extends StatelessWidget {
                 'Bobu Pizza v1.0.0',
                 style: GoogleFonts.poppins(
                   fontSize: 11 * scale,
-                  color: const Color(0xFF2D1A0E).withOpacity(0.3),
+                  color: isDark ? Colors.white30 : const Color(0xFF2D1A0E).withOpacity(0.3),
                 ),
               ),
 
@@ -235,7 +244,7 @@ class ProfileTab extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow(double scale) {
+  Widget _buildStatsRow(double scale, ThemeData theme, bool isDark) {
     final stats = [
       {'label': 'Orders',    'value': '12'},
       {'label': 'Favourites','value': '5'},
@@ -251,11 +260,11 @@ class ProfileTab extends StatelessWidget {
                   right: s != stats.last ? 10 * scale : 0),
               padding: EdgeInsets.symmetric(vertical: 14 * scale),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 border:
-                Border.all(color: const Color(0xFFE8D5C0), width: 1),
-                boxShadow: [
+                Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+                boxShadow: isDark ? [] : [
                   BoxShadow(
                     color: const Color(0xFF2D1A0E).withOpacity(0.05),
                     blurRadius: 8,
@@ -278,7 +287,7 @@ class ProfileTab extends StatelessWidget {
                     s['label']!,
                     style: GoogleFonts.poppins(
                       fontSize: 11 * scale,
-                      color: const Color(0xFF2D1A0E).withOpacity(0.45),
+                      color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45),
                     ),
                   ),
                 ],
@@ -291,7 +300,7 @@ class ProfileTab extends StatelessWidget {
   }
 
   Widget _buildSection(String title, List<_MenuItem> items,
-      double scale, BuildContext context) {
+      double scale, BuildContext context, ThemeData theme, bool isDark) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16 * scale),
       child: Column(
@@ -304,17 +313,17 @@ class ProfileTab extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: 13 * scale,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF2D1A0E).withOpacity(0.4),
+                color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.4),
                 letterSpacing: 0.5,
               ),
             ),
           ),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE8D5C0), width: 1),
-              boxShadow: [
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+              boxShadow: isDark ? [] : [
                 BoxShadow(
                   color: const Color(0xFF2D1A0E).withOpacity(0.05),
                   blurRadius: 10,
@@ -355,14 +364,16 @@ class ProfileTab extends StatelessWidget {
                                 style: GoogleFonts.poppins(
                                   fontSize: 13 * scale,
                                   fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF2D1A0E),
+                                  color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                                 ),
                               ),
                             ),
                             if (item.hasToggle)
                               Switch(
-                                value: false,
-                                onChanged: (_) {},
+                                value: ThemeService().isDarkMode,
+                                onChanged: (val) {
+                                  ThemeService().toggleTheme();
+                                },
                                 activeColor: AppColors.primary,
                                 materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
@@ -370,7 +381,7 @@ class ProfileTab extends StatelessWidget {
                             else
                               Icon(
                                 Icons.chevron_right_rounded,
-                                color: const Color(0xFF2D1A0E)
+                                color: isDark ? Colors.white24 : const Color(0xFF2D1A0E)
                                     .withOpacity(0.3),
                                 size: 20 * scale,
                               ),
@@ -381,7 +392,7 @@ class ProfileTab extends StatelessWidget {
                     if (!isLast)
                       Divider(
                         height: 1,
-                        color: const Color(0xFF2D1A0E).withOpacity(0.06),
+                        color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.06),
                         indent: 16 * scale,
                         endIndent: 16 * scale,
                       ),

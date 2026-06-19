@@ -1,8 +1,5 @@
-
-import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,7 +7,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/constants.dart';
-import '../services/supabase_service.dart';
 import '../services/cart_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -179,48 +175,71 @@ class _LoginScreenState extends State<LoginScreen>
     final double sh = size.height;
     final double contentWidth = sw.clamp(0.0, 430.0);
     final double scale = (contentWidth / 375).clamp(0.85, 1.1);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Update status bar brightness based on theme
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+    ));
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFF8F0),
-              Color(0xFFFFF0DC),
-              Color(0xFFFFE8C8),
-            ],
-            stops: [0.0, 0.55, 1.0],
-          ),
+        decoration: BoxDecoration(
+          gradient: isDark 
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1A1A1A),
+                  Color(0xFF121212),
+                  Color(0xFF000000),
+                ],
+              )
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFFF8F0),
+                  Color(0xFFFFF0DC),
+                  Color(0xFFFFE8C8),
+                ],
+                stops: [0.0, 0.55, 1.0],
+              ),
         ),
         child: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
           child: Stack(
             children: [
-              // ── Sauce splash — anchored to TOP of screen, not scroll ──
+              // ── Sauce splash ──
               Positioned(
                 top: -sh * 0.04,
                 left: -(contentWidth * 0.1),
                 child: Hero(
                   tag: 'sauce_splash',
-                  child: Image.asset(
-                    'assets/images/splash.png',
-                    width: contentWidth * 1.3,
-                    fit: BoxFit.contain,
+                  child: Opacity(
+                    opacity: isDark ? 0.6 : 1.0,
+                    child: Image.asset(
+                      'assets/images/splash.png',
+                      width: contentWidth * 1.3,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
 
-              // ── Pizza watermark — anchored to BOTTOM of screen ──
+              // ── Pizza watermark ──
               Positioned(
                 bottom: -40 * scale,
                 right: -40 * scale,
                 child: Opacity(
-                  opacity: 0.12,
+                  opacity: isDark ? 0.05 : 0.12,
                   child: Image.asset(
                     'assets/images/pizza.png',
                     width: 180 * scale,
@@ -243,15 +262,9 @@ class _LoginScreenState extends State<LoginScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              // Top space — pushes logo to roughly screen center
                               SizedBox(height: sh * 0.10),
-
-                              // ── Logo ──
-                              _buildLogo(scale),
-
+                              _buildLogo(scale, isDark),
                               SizedBox(height: 32 * scale),
-
-                              // ── Heading ──
                               AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 300),
                                 child: Text(
@@ -261,13 +274,11 @@ class _LoginScreenState extends State<LoginScreen>
                                   style: GoogleFonts.poppins(
                                     fontSize: 26 * scale,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF2D1A0E),
+                                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                                   ),
                                 ),
                               ),
-
                               SizedBox(height: 6 * scale),
-
                               AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 300),
                                 child: Text(
@@ -278,25 +289,20 @@ class _LoginScreenState extends State<LoginScreen>
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.poppins(
                                     fontSize: 13 * scale,
-                                    color: const Color(0xFF2D1A0E)
-                                        .withOpacity(0.5),
+                                    color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5),
                                     height: 1.5,
                                   ),
                                 ),
                               ),
-
                               SizedBox(height: 32 * scale),
-
-                              // ── Email field ──
                               _buildTextField(
                                 controller: _emailController,
                                 hintText: 'Email Address',
                                 prefixIcon: Icons.email_outlined,
                                 enabled: !_isOtpSent,
                                 scale: scale,
+                                isDark: isDark,
                               ),
-
-                              // ── OTP field (slides in when OTP sent) ──
                               AnimatedSize(
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeOutCubic,
@@ -304,14 +310,11 @@ class _LoginScreenState extends State<LoginScreen>
                                     ? Padding(
                                   padding: EdgeInsets.only(
                                       top: 16 * scale),
-                                  child: _buildOtpField(scale),
+                                  child: _buildOtpField(scale, isDark),
                                 )
                                     : const SizedBox.shrink(),
                               ),
-
                               SizedBox(height: 24 * scale),
-
-                              // ── Primary button ──
                               _buildPrimaryButton(
                                 label: _isOtpSent
                                     ? 'Verify & Login'
@@ -322,8 +325,6 @@ class _LoginScreenState extends State<LoginScreen>
                                 isLoading: _isLoading,
                                 scale: scale,
                               ),
-
-                              // ── Change email link ──
                               AnimatedSize(
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeOutCubic,
@@ -344,17 +345,10 @@ class _LoginScreenState extends State<LoginScreen>
                                 )
                                     : const SizedBox.shrink(),
                               ),
-
                               SizedBox(height: 28 * scale),
-
-                              // ── Divider ──
-                              _buildDivider(scale),
-
+                              _buildDivider(scale, isDark),
                               SizedBox(height: 28 * scale),
-
-                              // ── Google button ──
-                              _buildGoogleButton(scale),
-
+                              _buildGoogleButton(scale, isDark),
                               SizedBox(height: 48 * scale),
                             ],
                           ),
@@ -373,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ─── Logo ─────────────────────────────────────────────────────────
 
-  Widget _buildLogo(double scale) {
+  Widget _buildLogo(double scale, bool isDark) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -403,17 +397,17 @@ class _LoginScreenState extends State<LoginScreen>
               Container(
                   width: 30 * scale,
                   height: 1.2,
-                  color: AppColors.pizzaGreen.withOpacity(0.5)),
+                  color: AppColors.pizzaGreen.withOpacity(isDark ? 0.3 : 0.5)),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6 * scale),
                 child: Icon(Icons.local_pizza_outlined,
                     size: 13 * scale,
-                    color: AppColors.pizzaGreen.withOpacity(0.7)),
+                    color: AppColors.pizzaGreen.withOpacity(isDark ? 0.5 : 0.7)),
               ),
               Container(
                   width: 30 * scale,
                   height: 1.2,
-                  color: AppColors.pizzaGreen.withOpacity(0.5)),
+                  color: AppColors.pizzaGreen.withOpacity(isDark ? 0.3 : 0.5)),
             ],
           ),
         ),
@@ -430,15 +424,15 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── OTP field with big digit boxes ───────────────────────────────
+  // ─── OTP field ───────────────────────────────────────────────────
 
-  Widget _buildOtpField(double scale) {
+  Widget _buildOtpField(double scale, bool isDark) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.75),
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.75),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8D5C0), width: 1.2),
-        boxShadow: [
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: const Color(0xFFD4956A).withOpacity(0.08),
             blurRadius: 12,
@@ -454,20 +448,20 @@ class _LoginScreenState extends State<LoginScreen>
         style: GoogleFonts.poppins(
           fontSize: 22 * scale,
           fontWeight: FontWeight.bold,
-          color: const Color(0xFF2D1A0E),
+          color: isDark ? Colors.white : const Color(0xFF2D1A0E),
           letterSpacing: 10,
         ),
         decoration: InputDecoration(
           hintText: '• • • • • •',
           hintStyle: GoogleFonts.poppins(
-            color: const Color(0xFF2D1A0E).withOpacity(0.25),
+            color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.25),
             fontSize: 18 * scale,
             letterSpacing: 8,
           ),
           prefixIcon: Icon(Icons.pin_outlined,
               color: AppColors.primary.withOpacity(0.7), size: 20 * scale),
           border: InputBorder.none,
-          counterText: '', // hides the maxLength counter
+          counterText: '',
           contentPadding:
           EdgeInsets.symmetric(horizontal: 20, vertical: 16 * scale),
         ),
@@ -475,7 +469,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Email field ───────────────────────────────────────────────────
+  // ─── Text field ───────────────────────────────────────────────────
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -484,16 +478,17 @@ class _LoginScreenState extends State<LoginScreen>
     bool enabled = true,
     TextInputType keyboardType = TextInputType.emailAddress,
     required double scale,
+    required bool isDark,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: enabled
-            ? Colors.white.withOpacity(0.75)
-            : Colors.grey.withOpacity(0.08),
+            ? (isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.75))
+            : (isDark ? Colors.black26 : Colors.grey.withOpacity(0.08)),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8D5C0), width: 1.2),
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
         boxShadow: [
-          if (enabled)
+          if (enabled && !isDark)
             BoxShadow(
               color: const Color(0xFFD4956A).withOpacity(0.08),
               blurRadius: 12,
@@ -507,12 +502,12 @@ class _LoginScreenState extends State<LoginScreen>
         keyboardType: keyboardType,
         style: GoogleFonts.poppins(
           fontSize: 14 * scale,
-          color: const Color(0xFF2D1A0E),
+          color: isDark ? Colors.white : const Color(0xFF2D1A0E),
         ),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: GoogleFonts.poppins(
-            color: const Color(0xFF2D1A0E).withOpacity(0.35),
+            color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.35),
             fontSize: 14 * scale,
           ),
           prefixIcon: Icon(prefixIcon,
@@ -567,18 +562,18 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ─── Divider ───────────────────────────────────────────────────────
 
-  Widget _buildDivider(double scale) {
+  Widget _buildDivider(double scale, bool isDark) {
     return Row(
       children: [
         Expanded(
             child: Divider(
-                color: const Color(0xFF2D1A0E).withOpacity(0.15))),
+                color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.15))),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12 * scale),
           child: Text(
             'OR',
             style: GoogleFonts.poppins(
-              color: const Color(0xFF2D1A0E).withOpacity(0.35),
+              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.35),
               fontSize: 11 * scale,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.5,
@@ -587,24 +582,24 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         Expanded(
             child: Divider(
-                color: const Color(0xFF2D1A0E).withOpacity(0.15))),
+                color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.15))),
       ],
     );
   }
 
   // ─── Google button ─────────────────────────────────────────────────
 
-  Widget _buildGoogleButton(double scale) {
+  Widget _buildGoogleButton(double scale, bool isDark) {
     return GestureDetector(
       onTap: _isLoading ? null : _signInWithGoogle,
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.symmetric(vertical: 14 * scale),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE8D5C0), width: 1.2),
-          boxShadow: [
+          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
+          boxShadow: isDark ? [] : [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
               blurRadius: 10,
@@ -620,7 +615,7 @@ class _LoginScreenState extends State<LoginScreen>
               height: 22 * scale,
               width: 22 * scale,
               errorBuilder: (_, __, ___) =>
-                  Icon(Icons.g_mobiledata, size: 22 * scale),
+                  Icon(Icons.g_mobiledata, size: 22 * scale, color: isDark ? Colors.white : Colors.black),
             ),
             SizedBox(width: 12 * scale),
             Text(
@@ -628,7 +623,7 @@ class _LoginScreenState extends State<LoginScreen>
               style: GoogleFonts.poppins(
                 fontSize: 15 * scale,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF2D1A0E),
+                color: isDark ? Colors.white : const Color(0xFF2D1A0E),
               ),
             ),
           ],

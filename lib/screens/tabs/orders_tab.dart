@@ -68,9 +68,11 @@ class _OrdersTabState extends State<OrdersTab>
     final sw = MediaQuery.of(context).size.width;
     final double scale = (sw.clamp(0.0, 430.0) / 375).clamp(0.85, 1.1);
     final double bottomPad = MediaQuery.of(context).padding.bottom + 72;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF8F0),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +87,7 @@ class _OrdersTabState extends State<OrdersTab>
                 style: GoogleFonts.poppins(
                   fontSize: 24 * scale,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2D1A0E),
+                  color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                 ),
               ),
             ),
@@ -96,10 +98,10 @@ class _OrdersTabState extends State<OrdersTab>
               child: Container(
                 height: 44 * scale,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: const Color(0xFFE8D5C0), width: 1),
+                      color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
                 ),
                 child: TabBar(
                   controller: _tabController,
@@ -110,7 +112,7 @@ class _OrdersTabState extends State<OrdersTab>
                   indicatorSize: TabBarIndicatorSize.tab,
                   labelColor: Colors.white,
                   unselectedLabelColor:
-                  const Color(0xFF2D1A0E).withOpacity(0.5),
+                  isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5),
                   labelStyle: GoogleFonts.poppins(
                       fontSize: 13 * scale,
                       fontWeight: FontWeight.w600),
@@ -135,7 +137,7 @@ class _OrdersTabState extends State<OrdersTab>
 
                   // Active orders
                   _activeOrders.isEmpty
-                      ? _buildEmpty('No active orders', '🛵', scale)
+                      ? _buildEmpty('No active orders', '🛵', scale, isDark)
                       : ListView.builder(
                     padding: EdgeInsets.only(
                       left: 16 * scale,
@@ -145,12 +147,12 @@ class _OrdersTabState extends State<OrdersTab>
                     physics: const BouncingScrollPhysics(),
                     itemCount: _activeOrders.length,
                     itemBuilder: (context, i) => _buildOrderCard(
-                        _activeOrders[i], scale, true),
+                        _activeOrders[i], scale, true, isDark),
                   ),
 
                   // Past orders
                   _pastOrders.isEmpty
-                      ? _buildEmpty('No past orders', '📋', scale)
+                      ? _buildEmpty('No past orders', '📋', scale, isDark)
                       : ListView.builder(
                     padding: EdgeInsets.only(
                       left: 16 * scale,
@@ -160,7 +162,7 @@ class _OrdersTabState extends State<OrdersTab>
                     physics: const BouncingScrollPhysics(),
                     itemCount: _pastOrders.length,
                     itemBuilder: (context, i) => _buildOrderCard(
-                        _pastOrders[i], scale, false),
+                        _pastOrders[i], scale, false, isDark),
                   ),
                 ],
               ),
@@ -171,7 +173,7 @@ class _OrdersTabState extends State<OrdersTab>
     );
   }
 
-  Widget _buildEmpty(String msg, String emoji, double scale) {
+  Widget _buildEmpty(String msg, String emoji, double scale, bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -183,7 +185,7 @@ class _OrdersTabState extends State<OrdersTab>
             style: GoogleFonts.poppins(
               fontSize: 16 * scale,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF2D1A0E).withOpacity(0.5),
+              color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5),
             ),
           ),
         ],
@@ -192,7 +194,7 @@ class _OrdersTabState extends State<OrdersTab>
   }
 
   Widget _buildOrderCard(
-      Map<String, dynamic> order, double scale, bool isActive) {
+      Map<String, dynamic> order, double scale, bool isActive, bool isDark) {
     final int currentStep = order['step'] as int;
     final List<String> steps = List<String>.from(order['steps']);
 
@@ -200,10 +202,10 @@ class _OrdersTabState extends State<OrdersTab>
       margin: EdgeInsets.only(bottom: 14 * scale),
       padding: EdgeInsets.all(16 * scale),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE8D5C0), width: 1),
-        boxShadow: [
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: const Color(0xFF2D1A0E).withOpacity(0.06),
             blurRadius: 12,
@@ -224,7 +226,7 @@ class _OrdersTabState extends State<OrdersTab>
                 style: GoogleFonts.poppins(
                   fontSize: 14 * scale,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2D1A0E),
+                  color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                 ),
               ),
               Container(
@@ -257,7 +259,7 @@ class _OrdersTabState extends State<OrdersTab>
             order['date'],
             style: GoogleFonts.poppins(
               fontSize: 11 * scale,
-              color: const Color(0xFF2D1A0E).withOpacity(0.4),
+              color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.4),
             ),
           ),
 
@@ -268,19 +270,19 @@ class _OrdersTabState extends State<OrdersTab>
             order['items'],
             style: GoogleFonts.poppins(
               fontSize: 12 * scale,
-              color: const Color(0xFF2D1A0E).withOpacity(0.6),
+              color: isDark ? Colors.white60 : const Color(0xFF2D1A0E).withOpacity(0.6),
             ),
           ),
 
           SizedBox(height: 16 * scale),
 
           // Timeline
-          _buildTimeline(steps, currentStep, scale),
+          _buildTimeline(steps, currentStep, scale, isDark),
 
           SizedBox(height: 14 * scale),
 
           Divider(
-              color: const Color(0xFF2D1A0E).withOpacity(0.08),
+              color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.08),
               height: 1),
 
           SizedBox(height: 12 * scale),
@@ -323,7 +325,7 @@ class _OrdersTabState extends State<OrdersTab>
                   style: GoogleFonts.poppins(
                     fontSize: 12 * scale,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF2D1A0E).withOpacity(0.45),
+                    color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45),
                   ),
                 ),
             ],
@@ -334,7 +336,7 @@ class _OrdersTabState extends State<OrdersTab>
   }
 
   Widget _buildTimeline(
-      List<String> steps, int currentStep, double scale) {
+      List<String> steps, int currentStep, double scale, bool isDark) {
     return Row(
       children: List.generate(steps.length, (i) {
         final isDone = i <= currentStep;
@@ -349,12 +351,12 @@ class _OrdersTabState extends State<OrdersTab>
                     width: 26 * scale,
                     height: 26 * scale,
                     decoration: BoxDecoration(
-                      color: isDone ? AppColors.primary : Colors.white,
+                      color: isDone ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isDone
                             ? AppColors.primary
-                            : const Color(0xFFE8D5C0),
+                            : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
                         width: 1.5,
                       ),
                       boxShadow: isDone
@@ -373,7 +375,7 @@ class _OrdersTabState extends State<OrdersTab>
                       size: 13 * scale,
                       color: isDone
                           ? Colors.white
-                          : const Color(0xFF2D1A0E).withOpacity(0.25),
+                          : (isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.25)),
                     ),
                   ),
                   SizedBox(height: 4 * scale),
@@ -386,7 +388,7 @@ class _OrdersTabState extends State<OrdersTab>
                           : FontWeight.w400,
                       color: isDone
                           ? AppColors.primary
-                          : const Color(0xFF2D1A0E).withOpacity(0.3),
+                          : (isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.3)),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -400,7 +402,7 @@ class _OrdersTabState extends State<OrdersTab>
                     decoration: BoxDecoration(
                       color: i < currentStep
                           ? AppColors.primary
-                          : const Color(0xFFE8D5C0),
+                          : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

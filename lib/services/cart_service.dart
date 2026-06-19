@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/cart_item_model.dart';
 import '../models/pizza_model.dart';
+import 'supabase_service.dart';
 
 class CartService {
   static final client = Supabase.instance.client;
@@ -15,6 +16,7 @@ class CartService {
     if (user == null) return;
 
     try {
+      await SupabaseService.checkConnectivity();
       final data = await client
           .from('cart_items')
           .select('*, pizzas(*)')
@@ -41,6 +43,7 @@ class CartService {
     final existingIndex = currentItems.indexWhere((item) => item.pizza.id == pizza.id);
 
     try {
+      await SupabaseService.checkConnectivity();
       if (existingIndex != -1) {
         currentItems[existingIndex].quantity += quantity;
         await client
@@ -73,6 +76,7 @@ class CartService {
       final newQty = currentItems[index].quantity + delta;
       
       try {
+        await SupabaseService.checkConnectivity();
         if (newQty <= 0) {
           currentItems.removeAt(index);
           await client.from('cart_items').delete().eq('user_id', user.id).eq('pizza_id', pizzaId);
@@ -98,7 +102,12 @@ class CartService {
   static Future<void> clearCart() async {
     final user = client.auth.currentUser;
     if (user != null) {
-      await client.from('cart_items').delete().eq('user_id', user.id);
+      try {
+        await SupabaseService.checkConnectivity();
+        await client.from('cart_items').delete().eq('user_id', user.id);
+      } catch (e) {
+        debugPrint('Error clearing cart: $e');
+      }
     }
     cartItemsNotifier.value = [];
   }

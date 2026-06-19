@@ -118,16 +118,18 @@ class _MenuTabState extends State<MenuTab> {
     final double contentWidth = sw.clamp(0.0, 500.0);
     final double scale = (contentWidth / 375).clamp(0.85, 1.1);
     final double bottomPad = MediaQuery.of(context).padding.bottom + 80;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFFFF8F0),
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF8F0),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,7 +142,7 @@ class _MenuTabState extends State<MenuTab> {
                 style: GoogleFonts.poppins(
                   fontSize: 24 * scale,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2D1A0E),
+                  color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                 ),
               ),
             ),
@@ -150,7 +152,7 @@ class _MenuTabState extends State<MenuTab> {
                 'Explore our wide range of pizzas, handcrafted with fresh dough, premium cheeses, and locally sourced toppings.',
                 style: GoogleFonts.poppins(
                   fontSize: 13 * scale,
-                  color: const Color(0xFF2D1A0E).withOpacity(0.45),
+                  color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45),
                 ),
               ),
             ),
@@ -172,10 +174,10 @@ class _MenuTabState extends State<MenuTab> {
                       margin: EdgeInsets.only(right: 10 * scale),
                       padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
                       decoration: BoxDecoration(
-                        color: isActive ? AppColors.primary : Colors.white,
+                        color: isActive ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isActive ? AppColors.primary : const Color(0xFFE8D5C0),
+                          color: isActive ? AppColors.primary : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
                           width: 1.2,
                         ),
                         boxShadow: isActive
@@ -198,7 +200,7 @@ class _MenuTabState extends State<MenuTab> {
                             style: GoogleFonts.poppins(
                               fontSize: 12 * scale,
                               fontWeight: FontWeight.w600,
-                              color: isActive ? Colors.white : const Color(0xFF2D1A0E),
+                              color: isActive ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF2D1A0E)),
                             ),
                           ),
                         ],
@@ -218,7 +220,7 @@ class _MenuTabState extends State<MenuTab> {
                 '${_allItems.length} items',
                 style: GoogleFonts.poppins(
                   fontSize: 12 * scale,
-                  color: const Color(0xFF2D1A0E).withOpacity(0.4),
+                  color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.4),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -229,7 +231,7 @@ class _MenuTabState extends State<MenuTab> {
               child: RefreshIndicator(
                 onRefresh: _loadMenuData,
                 color: AppColors.primary,
-                backgroundColor: Colors.white,
+                backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 child: ListView.builder(
                   controller: _scrollController,
                   padding: EdgeInsets.only(
@@ -255,8 +257,8 @@ class _MenuTabState extends State<MenuTab> {
                     }
                     final item = _allItems[index];
                     return GestureDetector(
-                      onTap: () => _showPizzaDetails(context, item, scale),
-                      child: _buildMenuCard(item, scale),
+                      onTap: () => _showPizzaDetails(context, item, scale, isDark),
+                      child: _buildMenuCard(item, scale, isDark),
                     );
                   },
                 ),
@@ -268,7 +270,7 @@ class _MenuTabState extends State<MenuTab> {
     );
   }
 
-  void _showPizzaDetails(BuildContext context, Pizza item, double scale) {
+  void _showPizzaDetails(BuildContext context, Pizza item, double scale, bool isDark) {
     int quantity = 1;
 
     showModalBottomSheet(
@@ -280,9 +282,9 @@ class _MenuTabState extends State<MenuTab> {
           builder: (context, setModalState) {
             return Container(
               height: MediaQuery.of(context).size.height * 0.85,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
               ),
               child: Stack(
                 children: [
@@ -294,9 +296,9 @@ class _MenuTabState extends State<MenuTab> {
                         Container(
                           width: double.infinity,
                           height: 300 * scale,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFFF0DC),
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                           ),
                           child: Stack(
                             children: [
@@ -316,8 +318,8 @@ class _MenuTabState extends State<MenuTab> {
                                   onTap: () => Navigator.pop(context),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                                    child: const Icon(Icons.close, color: Colors.black, size: 20),
+                                    decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.1) : Colors.white, shape: BoxShape.circle),
+                                    child: Icon(Icons.close, color: isDark ? Colors.white : Colors.black, size: 20),
                                   ),
                                 ),
                               ),
@@ -368,22 +370,22 @@ class _MenuTabState extends State<MenuTab> {
                                               ),
                                             ),
                                             SizedBox(width: 10 * scale),
-                                            Text(item.category, style: GoogleFonts.poppins(fontSize: 12 * scale, color: AppColors.textGrey, fontWeight: FontWeight.w500)),
+                                            Text(item.category, style: GoogleFonts.poppins(fontSize: 12 * scale, color: isDark ? Colors.white38 : AppColors.textGrey, fontWeight: FontWeight.w500)),
                                           ],
                                         ),
                                         SizedBox(height: 8 * scale),
-                                        Text(item.name, style: GoogleFonts.poppins(fontSize: 26 * scale, fontWeight: FontWeight.bold, color: AppColors.textBlack)),
+                                        Text(item.name, style: GoogleFonts.poppins(fontSize: 26 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.textBlack)),
                                       ],
                                     ),
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(color: Colors.amber.withAlpha(30), borderRadius: BorderRadius.circular(12)),
+                                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                                     child: Row(
                                       children: [
                                         const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                                         const SizedBox(width: 4),
-                                        Text(item.rating.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        Text(item.rating.toString(), style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                       ],
                                     ),
                                   ),
@@ -393,22 +395,22 @@ class _MenuTabState extends State<MenuTab> {
                               SizedBox(height: 16 * scale),
                               
                               // 3. Description
-                              Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold)),
+                              Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                               SizedBox(height: 8 * scale),
-                              Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: AppColors.textGrey, height: 1.5)),
+                              Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white60 : AppColors.textGrey, height: 1.5)),
                               
                               SizedBox(height: 24 * scale),
                               
                               // 4. Customization Options (Placeholder)
                               Container(
                                 padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(16)),
+                                decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey[50], borderRadius: BorderRadius.circular(16)),
                                 child: Row(
                                   children: [
                                     const Icon(Icons.info_outline, color: Colors.blue),
                                     const SizedBox(width: 12),
                                     Expanded(
-                                      child: Text('Customization options coming soon!', style: GoogleFonts.poppins(fontSize: 12 * scale, color: Colors.blue[800])),
+                                      child: Text('Customization options coming soon!', style: GoogleFonts.poppins(fontSize: 12 * scale, color: isDark ? Colors.blue[200] : Colors.blue[800])),
                                     ),
                                   ],
                                 ),
@@ -428,8 +430,8 @@ class _MenuTabState extends State<MenuTab> {
                     child: Container(
                       padding: EdgeInsets.all(24 * scale),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 20, offset: const Offset(0, -5))],
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
                       ),
                       child: Row(
                         children: [
@@ -447,11 +449,11 @@ class _MenuTabState extends State<MenuTab> {
                           ),
                           // Quantity Counter
                           Container(
-                            decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!), borderRadius: BorderRadius.circular(12)),
                             child: Row(
                               children: [
-                                IconButton(onPressed: quantity > 1 ? () => setModalState(() => quantity--) : null, icon: const Icon(Icons.remove)),
-                                Text('$quantity', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                IconButton(onPressed: quantity > 1 ? () => setModalState(() => quantity--) : null, icon: const Icon(Icons.remove, color: Colors.grey)),
+                                Text('$quantity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                 IconButton(onPressed: () => setModalState(() => quantity++), icon: const Icon(Icons.add, color: AppColors.primary)),
                               ],
                             ),
@@ -462,13 +464,6 @@ class _MenuTabState extends State<MenuTab> {
                             onPressed: () {
                               CartService.addToCart(item, quantity: quantity);
                               Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${item.name} added to cart!'),
-                                  backgroundColor: Colors.green,
-                                  duration: const Duration(seconds: 1),
-                                ),
-                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
@@ -490,14 +485,14 @@ class _MenuTabState extends State<MenuTab> {
     );
   }
 
-  Widget _buildMenuCard(Pizza item, double scale) {
+  Widget _buildMenuCard(Pizza item, double scale, bool isDark) {
     return Container(
       margin: EdgeInsets.only(bottom: 24 * scale),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE8D5C0), width: 1),
-        boxShadow: [
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: const Color(0xFF2D1A0E).withOpacity(0.08),
             blurRadius: 16,
@@ -516,8 +511,8 @@ class _MenuTabState extends State<MenuTab> {
                 child: Container(
                   width: double.infinity,
                   height: 180 * scale,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFF0DC),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
                   ),
                   child: Hero(
                     tag: 'pizza_${item.id}',
@@ -639,7 +634,7 @@ class _MenuTabState extends State<MenuTab> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 18 * scale,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF2D1A0E),
+                                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                                   ),
                                 ),
                               ),
@@ -657,7 +652,7 @@ class _MenuTabState extends State<MenuTab> {
                           style: GoogleFonts.poppins(
                             fontSize: 14 * scale,
                             fontWeight: FontWeight.w600,
-                            color: const Color(0xFF2D1A0E),
+                            color: isDark ? Colors.white70 : const Color(0xFF2D1A0E),
                           ),
                         ),
                       ],
@@ -669,7 +664,7 @@ class _MenuTabState extends State<MenuTab> {
                   item.description,
                   style: GoogleFonts.poppins(
                     fontSize: 13 * scale,
-                    color: const Color(0xFF2D1A0E).withOpacity(0.5),
+                    color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -686,7 +681,7 @@ class _MenuTabState extends State<MenuTab> {
                             '₹${item.price.toInt()}',
                             style: GoogleFonts.poppins(
                               fontSize: 12 * scale,
-                              color: const Color(0xFF2D1A0E).withOpacity(0.3),
+                              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.3),
                               decoration: TextDecoration.lineThrough,
                             ),
                           ),
@@ -695,7 +690,7 @@ class _MenuTabState extends State<MenuTab> {
                           style: GoogleFonts.poppins(
                             fontSize: 22 * scale,
                             fontWeight: FontWeight.bold,
-                            color: const Color(0xFF2D1A0E),
+                            color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                           ),
                         ),
                       ],
@@ -705,13 +700,6 @@ class _MenuTabState extends State<MenuTab> {
                       child: ElevatedButton(
                         onPressed: () {
                           CartService.addToCart(item);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${item.name} added to cart!'),
-                              backgroundColor: Colors.green,
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,

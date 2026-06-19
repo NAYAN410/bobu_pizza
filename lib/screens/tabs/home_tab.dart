@@ -91,16 +91,18 @@ class _HomeTabState extends State<HomeTab> {
     final sw = MediaQuery.of(context).size.width;
     final double contentWidth = sw.clamp(0.0, 500.0);
     final double scale = (contentWidth / 375).clamp(0.85, 1.15);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFFFF8F0),
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF8F0),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAllData,
@@ -110,15 +112,15 @@ class _HomeTabState extends State<HomeTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(scale),
-                _buildSearchBar(scale),
+                _buildHeader(scale, isDark),
+                _buildSearchBar(scale, isDark),
                 if (_banners.isNotEmpty) _buildBannerCarousel(scale, contentWidth),
-                _buildSectionHeader('Categories', scale),
-                if (_categories.isNotEmpty) _buildCategories(scale),
-                _buildSectionHeader('Popular Pizzas', scale),
-                if (_popularPizzas.isNotEmpty) _buildVerticalPizzaList(scale),
-                _buildSectionHeader('Why Choose Us?', scale),
-                _buildWhyUs(scale),
+                _buildSectionHeader('Categories', scale, isDark),
+                if (_categories.isNotEmpty) _buildCategories(scale, isDark),
+                _buildSectionHeader('Popular Pizzas', scale, isDark),
+                if (_popularPizzas.isNotEmpty) _buildVerticalPizzaList(scale, isDark),
+                _buildSectionHeader('Why Choose Us?', scale, isDark),
+                _buildWhyUs(scale, isDark),
                 SizedBox(height: 90 * scale),
               ],
             ),
@@ -130,7 +132,7 @@ class _HomeTabState extends State<HomeTab> {
 
   // ─── Header ───────────────────────────────────────────────────────
 
-  Widget _buildHeader(double scale) {
+  Widget _buildHeader(double scale, bool isDark) {
     return Padding(
       padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 8 * scale),
       child: Row(
@@ -140,10 +142,10 @@ class _HomeTabState extends State<HomeTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(_getGreeting(),
-                style: GoogleFonts.poppins(fontSize: 13 * scale, color: const Color(0xFF2D1A0E).withOpacity(0.5), fontWeight: FontWeight.w500)),
+                style: GoogleFonts.poppins(fontSize: 13 * scale, color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5), fontWeight: FontWeight.w500)),
               SizedBox(height: 2 * scale),
               Text('What\'s your craving?',
-                style: GoogleFonts.poppins(fontSize: 20 * scale, fontWeight: FontWeight.bold, color: const Color(0xFF2D1A0E))),
+                style: GoogleFonts.poppins(fontSize: 20 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
             ],
           ),
           Stack(
@@ -151,11 +153,12 @@ class _HomeTabState extends State<HomeTab> {
               Container(
                 padding: EdgeInsets.all(10 * scale),
                 decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE8D5C0), width: 1.2),
-                  boxShadow: [BoxShadow(color: const Color(0xFF2D1A0E).withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
+                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.white, 
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
+                  boxShadow: isDark ? [] : [BoxShadow(color: const Color(0xFF2D1A0E).withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
                 ),
-                child: Icon(Icons.notifications_none_outlined, color: const Color(0xFF2D1A0E), size: 22 * scale),
+                child: Icon(Icons.notifications_none_outlined, color: isDark ? Colors.white70 : const Color(0xFF2D1A0E), size: 22 * scale),
               ),
               Positioned(
                 right: 9, top: 9,
@@ -173,22 +176,23 @@ class _HomeTabState extends State<HomeTab> {
 
   // ─── Search bar ───────────────────────────────────────────────────
 
-  Widget _buildSearchBar(double scale) {
+  Widget _buildSearchBar(double scale, bool isDark) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 10 * scale),
       child: Container(
         height: 52 * scale,
         decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE8D5C0), width: 1.2),
-          boxShadow: [BoxShadow(color: const Color(0xFF2D1A0E).withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4))],
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white, 
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
+          boxShadow: isDark ? [] : [BoxShadow(color: const Color(0xFF2D1A0E).withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: Row(
           children: [
             SizedBox(width: 16 * scale),
-            Icon(Icons.search_rounded, color: const Color(0xFF2D1A0E).withOpacity(0.3), size: 22 * scale),
+            Icon(Icons.search_rounded, color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.3), size: 22 * scale),
             SizedBox(width: 10 * scale),
-            Text('Search pizzas, sides, drinks...', style: GoogleFonts.poppins(color: const Color(0xFF2D1A0E).withOpacity(0.3), fontSize: 13 * scale)),
+            Text('Search pizzas, sides, drinks...', style: GoogleFonts.poppins(color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.3), fontSize: 13 * scale)),
             const Spacer(),
             Container(
               margin: EdgeInsets.all(8 * scale), padding: EdgeInsets.all(6 * scale),
@@ -275,20 +279,20 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildSectionHeader(String title, double scale) {
+  Widget _buildSectionHeader(String title, double scale, bool isDark) {
     return Padding(
       padding: EdgeInsets.fromLTRB(20 * scale, 20 * scale, 20 * scale, 12 * scale),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: GoogleFonts.poppins(fontSize: 17 * scale, fontWeight: FontWeight.bold, color: const Color(0xFF2D1A0E))),
+          Text(title, style: GoogleFonts.poppins(fontSize: 17 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
           Text('View all', style: GoogleFonts.poppins(fontSize: 13 * scale, fontWeight: FontWeight.w600, color: AppColors.primary)),
         ],
       ),
     );
   }
 
-  Widget _buildCategories(double scale) {
+  Widget _buildCategories(double scale, bool isDark) {
     return SizedBox(
       height: 100 * scale,
       child: ListView.builder(
@@ -305,17 +309,17 @@ class _HomeTabState extends State<HomeTab> {
               margin: EdgeInsets.only(right: 14 * scale),
               padding: EdgeInsets.symmetric(horizontal: 18 * scale),
               decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : Colors.white,
+                color: isActive ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isActive ? AppColors.primary : const Color(0xFFE8D5C0), width: 1.2),
-                boxShadow: [BoxShadow(color: isActive ? AppColors.primary.withOpacity(0.25) : const Color(0xFF2D1A0E).withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                border: Border.all(color: isActive ? AppColors.primary : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)), width: 1.2),
+                boxShadow: isActive ? [BoxShadow(color: AppColors.primary.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 4))] : (isDark ? [] : [BoxShadow(color: const Color(0xFF2D1A0E).withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(cat.icon, style: TextStyle(fontSize: 22 * scale)),
                   SizedBox(width: 8 * scale),
-                  Text(cat.name, style: GoogleFonts.poppins(fontSize: 13 * scale, fontWeight: FontWeight.w600, color: isActive ? Colors.white : const Color(0xFF2D1A0E))),
+                  Text(cat.name, style: GoogleFonts.poppins(fontSize: 13 * scale, fontWeight: FontWeight.w600, color: isActive ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF2D1A0E)))),
                 ],
               ),
             ),
@@ -325,18 +329,18 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildVerticalPizzaList(double scale) {
+  Widget _buildVerticalPizzaList(double scale, bool isDark) {
     return Column(
       children: _popularPizzas.map((pizza) {
         return GestureDetector(
-          onTap: () => _showPizzaDetails(context, pizza, scale),
+          onTap: () => _showPizzaDetails(context, pizza, scale, isDark),
           child: Container(
             margin: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 10 * scale),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFE8D5C0), width: 1),
-              boxShadow: [
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+              boxShadow: isDark ? [] : [
                 BoxShadow(
                   color: const Color(0xFF2D1A0E).withOpacity(0.08),
                   blurRadius: 16,
@@ -355,8 +359,8 @@ class _HomeTabState extends State<HomeTab> {
                       child: Container(
                         width: double.infinity,
                         height: 180 * scale,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFF0DC),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
                         ),
                         child: Hero(
                           tag: 'pizza_home_${pizza.id}',
@@ -478,7 +482,7 @@ class _HomeTabState extends State<HomeTab> {
                                         style: GoogleFonts.poppins(
                                           fontSize: 18 * scale,
                                           fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF2D1A0E),
+                                          color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                                         ),
                                       ),
                                     ),
@@ -496,7 +500,7 @@ class _HomeTabState extends State<HomeTab> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 14 * scale,
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF2D1A0E),
+                                  color: isDark ? Colors.white70 : const Color(0xFF2D1A0E),
                                 ),
                               ),
                             ],
@@ -508,7 +512,7 @@ class _HomeTabState extends State<HomeTab> {
                         pizza.description,
                         style: GoogleFonts.poppins(
                           fontSize: 13 * scale,
-                          color: const Color(0xFF2D1A0E).withOpacity(0.5),
+                          color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -525,7 +529,7 @@ class _HomeTabState extends State<HomeTab> {
                                   '₹${pizza.price.toInt()}',
                                   style: GoogleFonts.poppins(
                                     fontSize: 12 * scale,
-                                    color: const Color(0xFF2D1A0E).withOpacity(0.3),
+                                    color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.3),
                                     decoration: TextDecoration.lineThrough,
                                   ),
                                 ),
@@ -534,7 +538,7 @@ class _HomeTabState extends State<HomeTab> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 22 * scale,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF2D1A0E),
+                                  color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                                 ),
                               ),
                             ],
@@ -544,13 +548,6 @@ class _HomeTabState extends State<HomeTab> {
                       child: ElevatedButton(
                         onPressed: () {
                           CartService.addToCart(pizza);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${pizza.name} added to cart!'),
-                              backgroundColor: Colors.green,
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -584,7 +581,7 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  void _showPizzaDetails(BuildContext context, Pizza item, double scale) {
+  void _showPizzaDetails(BuildContext context, Pizza item, double scale, bool isDark) {
     int quantity = 1;
 
     showModalBottomSheet(
@@ -596,9 +593,9 @@ class _HomeTabState extends State<HomeTab> {
           builder: (context, setModalState) {
             return Container(
               height: MediaQuery.of(context).size.height * 0.85,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
               ),
               child: Stack(
                 children: [
@@ -610,9 +607,9 @@ class _HomeTabState extends State<HomeTab> {
                         Container(
                           width: double.infinity,
                           height: 300 * scale,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFFF0DC),
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                           ),
                           child: Stack(
                             children: [
@@ -632,8 +629,8 @@ class _HomeTabState extends State<HomeTab> {
                                   onTap: () => Navigator.pop(context),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                                    child: const Icon(Icons.close, color: Colors.black, size: 20),
+                                    decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.1) : Colors.white, shape: BoxShape.circle),
+                                    child: Icon(Icons.close, color: isDark ? Colors.white : Colors.black, size: 20),
                                   ),
                                 ),
                               ),
@@ -684,22 +681,22 @@ class _HomeTabState extends State<HomeTab> {
                                               ),
                                             ),
                                             SizedBox(width: 10 * scale),
-                                            Text(item.category, style: GoogleFonts.poppins(fontSize: 12 * scale, color: AppColors.textGrey, fontWeight: FontWeight.w500)),
+                                            Text(item.category, style: GoogleFonts.poppins(fontSize: 12 * scale, color: isDark ? Colors.white38 : AppColors.textGrey, fontWeight: FontWeight.w500)),
                                           ],
                                         ),
                                         SizedBox(height: 8 * scale),
-                                        Text(item.name, style: GoogleFonts.poppins(fontSize: 26 * scale, fontWeight: FontWeight.bold, color: const Color(0xFF2D1A0E))),
+                                        Text(item.name, style: GoogleFonts.poppins(fontSize: 26 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
                                       ],
                                     ),
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(color: Colors.amber.withAlpha(30), borderRadius: BorderRadius.circular(12)),
+                                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                                     child: Row(
                                       children: [
                                         const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                                         const SizedBox(width: 4),
-                                        Text(item.rating.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        Text(item.rating.toString(), style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                       ],
                                     ),
                                   ),
@@ -709,9 +706,9 @@ class _HomeTabState extends State<HomeTab> {
                               SizedBox(height: 16 * scale),
                               
                               // 3. Description
-                              Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold)),
+                              Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                               SizedBox(height: 8 * scale),
-                              Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: AppColors.textGrey, height: 1.5)),
+                              Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white60 : AppColors.textGrey, height: 1.5)),
                               
                               SizedBox(height: 100 * scale), // Space for bottom bar
                             ],
@@ -727,8 +724,8 @@ class _HomeTabState extends State<HomeTab> {
                     child: Container(
                       padding: EdgeInsets.all(24 * scale),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 20, offset: const Offset(0, -5))],
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
                       ),
                       child: Row(
                         children: [
@@ -746,11 +743,11 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                           // Quantity Counter
                           Container(
-                            decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!), borderRadius: BorderRadius.circular(12)),
                             child: Row(
                               children: [
-                                IconButton(onPressed: quantity > 1 ? () => setModalState(() => quantity--) : null, icon: const Icon(Icons.remove)),
-                                Text('$quantity', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                IconButton(onPressed: quantity > 1 ? () => setModalState(() => quantity--) : null, icon: const Icon(Icons.remove, color: Colors.grey)),
+                                Text('$quantity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                 IconButton(onPressed: () => setModalState(() => quantity++), icon: const Icon(Icons.add, color: AppColors.primary)),
                               ],
                             ),
@@ -761,13 +758,6 @@ class _HomeTabState extends State<HomeTab> {
                             onPressed: () {
                               CartService.addToCart(item, quantity: quantity);
                               Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${item.name} added to cart!'),
-                                  backgroundColor: Colors.green,
-                                  duration: const Duration(seconds: 1),
-                                ),
-                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
@@ -789,7 +779,7 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildWhyUs(double scale) {
+  Widget _buildWhyUs(double scale, bool isDark) {
     final perks = [
       {'icon': '🚀', 'title': 'Fast Delivery', 'sub': 'Under 30 minutes'},
       {'icon': '🍕', 'title': 'Fresh Dough', 'sub': 'Made daily'},
@@ -804,17 +794,18 @@ class _HomeTabState extends State<HomeTab> {
               margin: EdgeInsets.only(right: p != perks.last ? 10 * scale : 0),
               padding: EdgeInsets.symmetric(vertical: 14 * scale, horizontal: 8 * scale),
               decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE8D5C0), width: 1),
-                boxShadow: [BoxShadow(color: const Color(0xFF2D1A0E).withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 3))],
+                color: isDark ? Colors.white.withOpacity(0.05) : Colors.white, 
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+                boxShadow: isDark ? [] : [BoxShadow(color: const Color(0xFF2D1A0E).withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 3))],
               ),
               child: Column(
                 children: [
                   Text(p['icon']!, style: TextStyle(fontSize: 24 * scale)),
                   SizedBox(height: 6 * scale),
-                  Text(p['title']!, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11 * scale, fontWeight: FontWeight.bold, color: const Color(0xFF2D1A0E))),
+                  Text(p['title']!, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
                   SizedBox(height: 2 * scale),
-                  Text(p['sub']!, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 9 * scale, color: const Color(0xFF2D1A0E).withOpacity(0.45))),
+                  Text(p['sub']!, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 9 * scale, color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45))),
                 ],
               ),
             ),
