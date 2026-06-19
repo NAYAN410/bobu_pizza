@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../core/constants.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
-import '../models/cart_item_model.dart';
+import '../models/address_model.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -13,24 +13,49 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final _addressController = TextEditingController();
-  final _mobileController = TextEditingController();
   final _couponController = TextEditingController();
   String _paymentMode = 'COD';
   bool _isPlacingOrder = false;
+  List<AddressModel> _addresses = [];
+  AddressModel? _selectedAddress;
+  bool _isLoadingAddresses = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAddresses();
+  }
 
   @override
   void dispose() {
-    _addressController.dispose();
-    _mobileController.dispose();
     _couponController.dispose();
     super.dispose();
   }
 
+  Future<void> _fetchAddresses() async {
+    setState(() => _isLoadingAddresses = true);
+    try {
+      final data = await SupabaseService.getAddresses();
+      if (mounted) {
+        setState(() {
+          _addresses = data.map((json) => AddressModel.fromJson(json)).toList();
+          if (_addresses.isNotEmpty) {
+            _selectedAddress = _addresses.first;
+          }
+          _isLoadingAddresses = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingAddresses = false);
+      }
+    }
+  }
+
   Future<void> _placeOrder() async {
-    if (_addressController.text.isEmpty || _mobileController.text.isEmpty) {
+    if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter address and mobile number'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Please select a delivery address'), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -46,17 +71,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }).toList();
 
       await SupabaseService.placeOrder(
-        address: _addressController.text.trim(),
-        mobile: _mobileController.text.trim(),
+        address: _selectedAddress!.fullAddress,
+        mobile: _selectedAddress!.phoneNumber,
         paymentMode: _paymentMode,
         totalAmount: CartService.subtotal,
         items: orderItems,
       );
 
       if (mounted) {
-        await CartService.clearCart(); // Clear local and remote cart
+        await CartService.clearCart(); 
         setState(() => _isPlacingOrder = false);
-        
         _showSuccessDialog();
       }
     } catch (e) {
@@ -88,8 +112,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // close dialog
-                  Navigator.of(context).pushReplacementNamed('/home'); // back to home
+                  Navigator.of(context).pop(); 
+                  Navigator.of(context).pushReplacementNamed('/home'); 
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -130,7 +154,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Order Items Summary
             _buildSectionTitle('Order Summary', scale),
             Container(
               decoration: BoxDecoration(
@@ -163,29 +186,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             
             SizedBox(height: 24 * scale),
 
-            // 2. Delivery Address
             _buildSectionTitle('Delivery Address', scale),
-            _buildTextField(
-              controller: _addressController,
-              hintText: 'Flat No, Building Name, Area...',
-              maxLines: 3,
-              scale: scale,
-            ),
-            
-            SizedBox(height: 16 * scale),
-
-            // 3. Mobile Number
-            _buildSectionTitle('Mobile Number', scale),
-            _buildTextField(
-              controller: _mobileController,
-              hintText: '+91 00000 00000',
-              keyboardType: TextInputType.phone,
-              scale: scale,
-            ),
+            _buildAddressSection(scale),
             
             SizedBox(height: 24 * scale),
 
-            // 4. Coupon Code
             _buildSectionTitle('Coupon Code', scale),
             Row(
               children: [
@@ -211,7 +216,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             
             SizedBox(height: 24 * scale),
 
-            // 5. Payment Mode
             _buildSectionTitle('Payment Mode', scale),
             _buildPaymentOption('COD', 'Cash on Delivery', Icons.money_rounded, scale),
             const SizedBox(height: 12),
@@ -219,7 +223,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             
             SizedBox(height: 32 * scale),
 
-            // 6. Total Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -257,6 +260,93 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             SizedBox(height: 40 * scale),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAddressSection(double scale) {
+    if (_isLoadingAddresses) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
+    if (_addresses.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE8D5C0)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              'No saved addresses found',
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final result = await Navigator.pushNamed(context, '/addresses');
+                _fetchAddresses();
+              },
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text('Add Address', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8D5C0)),
+      ),
+      child: Column(
+        children: [
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _addresses.length,
+            separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey[100]),
+            itemBuilder: (context, index) {
+              final address = _addresses[index];
+              final isSelected = _selectedAddress?.id == address.id;
+              return ListTile(
+                onTap: () => setState(() => _selectedAddress = address),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  color: isSelected ? AppColors.primary : Colors.grey,
+                ),
+                title: Text(address.title, style: GoogleFonts.poppins(fontSize: 14 * scale, fontWeight: FontWeight.bold)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(address.fullAddress, style: GoogleFonts.poppins(fontSize: 12 * scale, color: Colors.grey[600])),
+                    Text('Ph: ${address.phoneNumber}', style: GoogleFonts.poppins(fontSize: 11 * scale, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              );
+            },
+          ),
+          Divider(height: 1, color: Colors.grey[100]),
+          TextButton.icon(
+            onPressed: () async {
+              await Navigator.pushNamed(context, '/addresses');
+              _fetchAddresses();
+            },
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add New Address'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          ),
+        ],
       ),
     );
   }
