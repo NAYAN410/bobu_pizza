@@ -205,11 +205,7 @@ class _LoginScreenState extends State<LoginScreen>
             : const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFFFF8F0),
-                  Color(0xFFFFF0DC),
-                  Color(0xFFFFE8C8),
-                ],
+                colors: AppColors.bgGradient,
                 stops: [0.0, 0.55, 1.0],
               ),
         ),
