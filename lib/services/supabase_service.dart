@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/material.dart';
 import 'dart:io';
 import '../main.dart';
 
@@ -112,5 +113,79 @@ class SupabaseService {
     }).toList();
 
     await client.from('order_items').insert(orderItems);
+  }
+
+  // Address Methods
+  static Future<List<Map<String, dynamic>>> getAddresses() async {
+    await checkConnectivity();
+    final user = client.auth.currentUser;
+    if (user == null) return [];
+    
+    final data = await client
+        .from('addresses')
+        .select()
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(data);
+  }
+
+  static Future<void> addAddress(Map<String, dynamic> addressData) async {
+    await checkConnectivity();
+    final user = client.auth.currentUser;
+    if (user == null) throw 'User not logged in';
+    
+    await client.from('addresses').insert({
+      ...addressData,
+      'user_id': user.id,
+    });
+  }
+
+  static Future<void> deleteAddress(String addressId) async {
+    await checkConnectivity();
+    await client.from('addresses').delete().eq('id', addressId);
+  }
+
+  // Profile Methods
+  static Future<Map<String, dynamic>?> getProfile() async {
+    await checkConnectivity();
+    final user = client.auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final data = await client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      if (data == null) {
+        // Fallback: Create profile if trigger didn't run
+        final newProfile = {
+          'id': user.id,
+          'full_name': user.userMetadata?['full_name'] ?? user.email?.split('@').first ?? 'Guest',
+          'phone': '',
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        await client.from('profiles').insert(newProfile);
+        return newProfile;
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+      // If error is due to missing record, try one last time to create it
+      return null;
+    }
+  }
+
+  static Future<void> updateProfile(Map<String, dynamic> profileData) async {
+    await checkConnectivity();
+    final user = client.auth.currentUser;
+    if (user == null) throw 'User not logged in';
+
+    await client.from('profiles').upsert({
+      'id': user.id,
+      ...profileData,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
   }
 }

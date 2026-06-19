@@ -2,11 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
+import '../../services/supabase_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/theme_service.dart';
 
-class ProfileTab extends StatelessWidget {
+class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
+
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  Map<String, dynamic>? _profileData;
+  bool _isLoadingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    final data = await SupabaseService.getProfile();
+    if (mounted) {
+      setState(() {
+        _profileData = data;
+        _isLoadingProfile = false;
+      });
+    }
+  }
 
   Future<void> _signOut(BuildContext context) async {
     await Supabase.instance.client.auth.signOut();
@@ -26,7 +51,7 @@ class ProfileTab extends StatelessWidget {
 
     final user = Supabase.instance.client.auth.currentUser;
     final String email = user?.email ?? 'guest@bobupizza.com';
-    final String name = user?.userMetadata?['full_name'] ??
+    final String name = _profileData?['full_name'] ?? user?.userMetadata?['full_name'] ??
         email.split('@').first;
     final String initials = name.isNotEmpty
         ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
@@ -35,10 +60,12 @@ class ProfileTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
+        child: _isLoadingProfile 
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          : SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
               // Header card
               _buildProfileHeader(name, email, initials, scale),
 
@@ -338,7 +365,16 @@ class ProfileTab extends StatelessWidget {
                 return Column(
                   children: [
                     GestureDetector(
-                      onTap: () {},
+                      onTap: () async {
+                        if (item.label == 'Saved Addresses') {
+                          Navigator.pushNamed(context, '/addresses');
+                        } else if (item.label == 'Edit Profile') {
+                          final result = await Navigator.pushNamed(context, '/edit-profile');
+                          if (result == true) {
+                            _fetchProfile();
+                          }
+                        }
+                      },
                       behavior: HitTestBehavior.opaque,
                       child: Padding(
                         padding: EdgeInsets.symmetric(
@@ -374,7 +410,7 @@ class ProfileTab extends StatelessWidget {
                                 onChanged: (val) {
                                   ThemeService().toggleTheme();
                                 },
-                                activeColor: AppColors.primary,
+                                activeTrackColor: AppColors.primary,
                                 materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
                               )

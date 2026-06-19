@@ -40,6 +40,8 @@
 	<true/>
 
 	<!-- GOOGLE SIGN IN FIX -->
+	<key>GIDClientID</key>
+	<string>474443519088-3druogolel6953mb25gkgcb4p3o2jnlo.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

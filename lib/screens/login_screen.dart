@@ -112,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen>
       // Android requires no clientId (uses google-services.json)
       // iOS requires the specific Client ID to start the sign-in flow
       final googleSignIn = GoogleSignIn(
-        clientId: isIOS ? '474443519088-3druogolel6953mb25gkgcb4p3o2jnlo.apps.googleusercontent.com' : null,
+        clientId: isIOS ? dotenv.env['GOOGLE_IOS_CLIENT_ID'] : null,
         serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
       );
       
