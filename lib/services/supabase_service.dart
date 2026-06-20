@@ -113,7 +113,7 @@ class SupabaseService {
       'razorpay_order_id': razorpayOrderId,
       'razorpay_payment_id': razorpayPaymentId,
       'total_amount': totalAmount,
-      'status': 'placed',
+      'status': 'pending',
       'coupon_id': couponId,
     });
 
@@ -134,6 +134,20 @@ class SupabaseService {
         'coupon_id': couponId,
       });
     }
+  }
+
+  static Future<List<Map<String, dynamic>>> getUserOrders() async {
+    await checkConnectivity();
+    final user = client.auth.currentUser;
+    if (user == null) return [];
+
+    final data = await client
+        .from('orders')
+        .select('*, order_items(*, pizzas(*))')
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false);
+    
+    return List<Map<String, dynamic>>.from(data);
   }
 
   // Coupon Methods

@@ -20,6 +20,7 @@ dependencies:
   shared_preferences: ^2.2.3
   cupertino_icons: ^1.0.8
   razorpay_flutter: ^1.4.5
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
