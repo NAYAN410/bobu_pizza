@@ -5,7 +5,6 @@ on:
 
 jobs:
   build-ios:
-    name: 🎉 Unsigned iOS Build
     runs-on: macos-latest
 
     steps:
@@ -16,7 +15,6 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          architecture: x64
 
       - name: Flutter Pub Get
         run: flutter pub get
@@ -32,43 +30,36 @@ jobs:
           echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
 
       - name: Pod Repo Update
-        run: pod repo update
         working-directory: ios
+        run: pod repo update
 
-      - name: Build iOS App
+      - name: Generate iOS Files
+        run: flutter build ios --config-only
+
+      - name: Build Unsigned Runner.app
         run: |
-          flutter build ios --release --no-codesign \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --build-name=1.0.0 \
-            --build-number=1
-
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
-            -configuration Release \
             -sdk iphoneos \
+            -configuration Release \
+            -archivePath build/Runner.xcarchive \
+            archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            DEVELOPMENT_TEAM=""
 
       - name: Create IPA Structure
         run: |
-          mkdir -p build/ios/iphoneos/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          mkdir -p Payload
+          cp -R build/Runner.xcarchive/Products/Applications/Runner.app Payload/
 
-      - name: Remove macOS Metadata
-        run: |
-          find build/ios/iphoneos -name ".DS_Store" -delete
+      - name: Create IPA
+        run: zip -r FlutterIpaExport.ipa Payload
 
-      - name: Create IPA File
-        run: |
-          cd build/ios/iphoneos
-          zip -r FlutterIpaExport.ipa Payload
-
-      - name: Upload IPA Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-ios-ipa
-          path: build/ios/iphoneos/FlutterIpaExport.ipa
+          path: FlutterIpaExport.ipa
