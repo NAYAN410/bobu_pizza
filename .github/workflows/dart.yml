@@ -1,7 +1,7 @@
 name: iOS-ipa-build
 
 on:
-  workflow_dispatch: # Manual run karne ke liye
+  workflow_dispatch:
 
 jobs:
   build-ios:
@@ -16,7 +16,7 @@ jobs:
           channel: stable
           architecture: arm64
 
-      # 1. Credentials injection (.env file create karna)
+      # 1. Credentials injection (.env file configuration)
       - name: Create .env File
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
@@ -26,46 +26,36 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
 
-      # 3. Native iOS workspace configuration ready karna
+      # 3. Native iOS workspace structure aur Podfile ready karna
       - name: Auto-Generate iOS Workspace Config
         run: flutter build ios --config-only
 
-      # 4. CocoaPods fresh installation (Ab Google Sign-In nahi hai to error nahi aayega)
+      # 4. CocoaPods dependency install karna
       - name: Pod Repo Update & Install
         run: |
           pod repo update
           pod install
         working-directory: ios
 
-      # 5. Flutter assets ko binary folder me map karna
-      - name: Build Flutter Bundle Assets
-        run: flutter build bundle
-
-      # ERROR FIX: Direct native compiler engine se Simulator target par building trigger karna (Codesign Bypass)
-      - name: Build Unsigned iOS Framework via Xcode Build Tool
+      # ERROR FIX: Flutter CLI ko Simulator SDK force parameters ke sath run karna (Isse code-sign bypass ho jata hai)
+      - name: Build Unsigned Simulator App Bundle
         run: |
-          xcodebuild -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+          flutter build ios --release --simulator --no-codesign -- \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            build
+            PROVISIONING_PROFILE_SPECIFIER=""
 
-      # 6. Unsigned application binary ko AltStore (.ipa) compatible layout me pack karna
+      # 5. Generated App bundle ko AltStore format (.ipa) me convert karna
       - name: Create IPA Structure & Package
         run: |
           mkdir -p build/ios/iphoneos/Payload
-          cp -R ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Release-iphonesimulator/Runner.app build/ios/iphoneos/Payload/ || cp -R build/ios/iphonesimulator/Build/Intermediates.noindex/ArchiveIntermediates/Runner/InstallationBuildProductsLocation/Applications/Runner.app build/ios/iphoneos/Payload/
+          cp -R build/ios/iphonesimulator/Runner.app build/ios/iphoneos/Payload/
           cd build/ios/iphoneos
           zip -r FlutterIpaExport.ipa Payload
 
-      # 7. Final .ipa file upload karna (Jise AltServer se install karenge)
+      # 6. Output File download ke liye Artifacts me bhejna
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
