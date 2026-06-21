@@ -1,38 +1,66 @@
-name: iOS Unsigned IPA Build
+name: iOS-ipa-build
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-ios:
+    name: 🎉 Unsigned iOS Build
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.32.5'
+          channel: stable
+          architecture: x64
 
-      - name: Flutter Clean
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Create .env File
         run: |
-          flutter clean
-          flutter pub get
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
 
-      - name: Install Pods
+      - name: Create GoogleService-Info.plist
         run: |
-          cd ios
-          rm -rf Pods
-          rm -rf Podfile.lock
-          pod repo update
-          pod install
+          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
 
-      - name: Build IPA
-        run: flutter build ipa --release --no-codesign --verbose
+      - name: Pod Repo Update
+        run: pod repo update
+        working-directory: ios
 
-      - name: Upload IPA
+      - name: Disable Code Signing
+        run: |
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_IDENTITY = .*;/CODE_SIGN_IDENTITY = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' ios/Runner.xcodeproj/project.pbxproj
+
+      - name: Build iOS App
+        run: flutter build ios --release --no-codesign
+
+      - name: Create IPA Structure
+        run: |
+          mkdir -p build/ios/iphoneos/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+
+      - name: Remove macOS Metadata
+        run: |
+          find build/ios/iphoneos -name ".DS_Store" -delete
+
+      - name: Create IPA File
+        run: |
+          cd build/ios/iphoneos
+          zip -r FlutterIpaExport.ipa Payload
+
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa
-          path: build/ios/ipa/*.ipa
+          name: unsigned-ios-ipa
+          path: build/ios/iphoneos/FlutterIpaExport.ipa
