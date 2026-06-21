@@ -152,7 +152,7 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
         boxShadow: isDark ? [] : [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -188,9 +188,9 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
                     children: [
                       Container(
                         width: 40, height: 40,
-                        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(color: AppColors.primary.withAlpha(26), borderRadius: BorderRadius.circular(8)),
                         child: pizza['image_url'] != null 
-                          ? Image.network(pizza['image_url'], fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.local_pizza, color: AppColors.primary))
+                          ? Image.network(pizza['image_url'], fit: BoxFit.contain, errorBuilder: (context, error, stackTrace) => const Icon(Icons.local_pizza, color: AppColors.primary))
                           : const Icon(Icons.local_pizza, color: AppColors.primary),
                       ),
                       const SizedBox(width: 12),
@@ -221,6 +221,7 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -255,7 +256,7 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: color.withAlpha(26), borderRadius: BorderRadius.circular(8)),
       child: Text(
         label,
         style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.bold, color: color),
