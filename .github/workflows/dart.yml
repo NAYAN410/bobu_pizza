@@ -1,7 +1,7 @@
 name: iOS-ipa-build
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Sirf manual trigger ke liye jaise aapne rakha tha
 
 jobs:
   build-ios:
@@ -9,56 +9,51 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4 # Latest version use karein (.gitignore bypass ke liye)
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          architecture: x64
+          architecture: arm64 # M1/M2 macs ke liye arm64 standard hai aajkal github runners par
 
-      - name: Flutter Pub Get
-        run: flutter pub get
-
+      # 1. Credentials injection (.env file configuration)
       - name: Create .env File
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
           echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
 
+      # 2. Plist Injection (Bina base64 decode ke agar text file paste ki hai)
       - name: Create GoogleService-Info.plist
         run: |
-          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
+          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" > ios/Runner/GoogleService-Info.plist
 
+      # 3. Pub packages get karna
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      # 4. CocoaPods setup aur Pod update process
       - name: Pod Repo Update
-        run: pod repo update
+        run: |
+          pod repo update
+          pod install
         working-directory: ios
 
-      - name: Disable Code Signing
-        run: |
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGN_IDENTITY = .*;/CODE_SIGN_IDENTITY = "";/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' ios/Runner.xcodeproj/project.pbxproj
+      # NOTE: Hamne "Disable Code Signing" ka sed script step hata diya hai kyunki uski wajah se Xcode crash ho rha tha.
 
+      # 5. Pure Unsigned iOS framework compile karna
       - name: Build iOS App
         run: flutter build ios --release --no-codesign
 
-      - name: Create IPA Structure
+      # 6. AltStore/AltServer ke liye .ipa package bundle generate karna
+      - name: Create IPA Structure & Package
         run: |
           mkdir -p build/ios/iphoneos/Payload
           cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
-
-      - name: Remove macOS Metadata
-        run: |
-          find build/ios/iphoneos -name ".DS_Store" -delete
-
-      - name: Create IPA File
-        run: |
           cd build/ios/iphoneos
           zip -r FlutterIpaExport.ipa Payload
 
+      # 7. Downloadable application file ready karna
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
