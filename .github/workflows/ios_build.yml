@@ -49,41 +49,67 @@ jobs:
             s/CODE_SIGN_IDENTITY\s*=\s*[^;]*;/CODE_SIGN_IDENTITY = "";/g;
           ' -i ios/Runner.xcodeproj/project.pbxproj
 
-      - name: Build Flutter iOS (no codesign)
+          echo "---- Signing patch applied ----"
+          grep -n "CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -5 || true
+
+      - name: Build iOS with xcodebuild directly (no flutter build)
         run: |
-          flutter clean
+          set -e
+
+          # Generate Flutter files first (no xcode involved)
           flutter pub get
-          flutter build ios --release --no-codesign || true
+          dart run flutter_launcher_icons 2>/dev/null || true
+
+          # Let Flutter generate its xcconfig and plugin registrant
+          flutter build ios --config-only 2>/dev/null || true
+
+          DERIVED_DATA="$PWD/build/ios/DerivedData"
+
+          # Build directly with xcodebuild, force all signing off at CLI level
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$DERIVED_DATA" \
+            FLUTTER_BUILD_MODE=release \
+            FLUTTER_ROOT="$(flutter --version 2>/dev/null | head -1 || echo '')" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            build 2>&1 | tail -50
 
           echo "---- Searching for Runner.app ----"
-          find "$PWD/build/ios" -name "Runner.app" -type d 2>/dev/null || true
+          find "$DERIVED_DATA" -name "Runner.app" -type d 2>/dev/null
 
       - name: Package unsigned IPA
         run: |
           set -e
 
-          # Find Runner.app anywhere under build/ios
-          APP_PATH=$(find "$PWD/build/ios" -name "Runner.app" -type d | head -1)
+          DERIVED_DATA="$PWD/build/ios/DerivedData"
+          APP_PATH=$(find "$DERIVED_DATA" -name "Runner.app" -type d | grep -v simulator | head -1)
 
           if [ -z "$APP_PATH" ]; then
-            echo "❌ Runner.app not found anywhere!"
-            find "$PWD/build/ios" -type d | head -20 || true
+            echo "❌ Runner.app not found!"
+            find "$DERIVED_DATA" -type d -name "*.app" | head -10 || true
             exit 1
           fi
 
           APP_SIZE=$(du -sh "$APP_PATH" | cut -f1)
-          echo "✅ Runner.app found at: $APP_PATH"
+          echo "✅ Runner.app at: $APP_PATH"
           echo "✅ Size: $APP_SIZE"
 
           IPA_DIR="$PWD/build/ios/ipa"
           mkdir -p "$IPA_DIR/Payload"
           cp -R "$APP_PATH" "$IPA_DIR/Payload/Runner.app"
-
           cd "$IPA_DIR"
           zip -r unsigned-device.ipa Payload/
 
-          IPA_SIZE=$(du -sh unsigned-device.ipa | cut -f1)
-          echo "✅ IPA created — Size: $IPA_SIZE"
+          echo "✅ IPA Size: $(du -sh unsigned-device.ipa | cut -f1)"
 
       - name: Upload Unsigned Device IPA
         uses: actions/upload-artifact@v4
