@@ -3,8 +3,8 @@ name: Flutter iOS Unsigned IPA Build
 on:
   push:
     branches:
-      - main # Agar aapka branch master hai to yahan master likhein
-  workflow_dispatch: # Isse aap GitHub website se manually bhi build start kar sakte hain
+      - master # Aapka active branch yahan set kar diya hai
+  workflow_dispatch: # Isse aap GitHub web dashboard se manually bhi run kar sakte hain
 
 jobs:
   build:
@@ -12,35 +12,46 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # 1. Repository se code checkout karna
+      # 1. GitHub repository se code pull karna
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Java setup karna (Kuch Flutter plugins ke liye zaroori hai)
+      # 2. Supabase credentials ke liye .env file create karna
+      - name: Create .env file from Secrets
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+
+      # 3. Google Sign-In ke liye plist file config folder me generate karna
+      - name: Create GoogleService-Info.plist
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" > ios/Runner/GoogleService-Info.plist
+
+      # 4. Java SDK setup karna (Required for certain internal tasks)
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 3. Flutter SDK setup karna
+      # 5. Flutter SDK environment ready karna
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x' # Apni zaroorat ke mutabik version change kar sakte hain
+          flutter-version: '3.22.x' # Apne exact version ke hisab se ise badal sakte hain
           channel: 'stable'
           cache: true
 
-      # 4. Project ki pub dependencies get karna
+      # 6. Pub packages code me pull karna
       - name: Install Dependencies
         run: flutter pub get
 
-      # 5. Pods install karna aur iOS build bina code-sign ke ready karna
+      # 7. iOS build ko compile karna bina Apple Developer credentials ke
       - name: Build iOS Application (No Code Sign)
         run: |
           flutter build ios --release --no-codesign
 
-      # 6. Runner.app ko AltStore ke liye .ipa format me convert karna
+      # 8. Compile bundle (.app) ko zip karke AltStore compatible .ipa banana
       - name: Package Unsigned IPA for AltStore
         run: |
           mkdir -p Payload
@@ -48,9 +59,9 @@ jobs:
           zip -r AltStore-Runner.ipa Payload
           rm -rf Payload
 
-      # 7. Final .ipa file ko GitHub Artifacts me upload karna (Jahan se aap download karenge)
+      # 9. Final build file download ke liye artifact section me bhejna
       - name: Upload IPA Artifact
-        uses: actions/artifacts@v4
+        uses: actions/upload-artifact@v4
         with:
           name: ios-testing-ipa
           path: AltStore-Runner.ipa
