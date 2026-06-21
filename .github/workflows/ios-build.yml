@@ -1,0 +1,57 @@
+name: Flutter iOS Unsigned IPA Build
+
+on:
+  push:
+    branches:
+      - main # Agar aapka branch master hai to yahan master likhein
+  workflow_dispatch: # Isse aap GitHub website se manually bhi build start kar sakte hain
+
+jobs:
+  build:
+    name: Build Unsigned IPA
+    runs-on: macos-latest
+
+    steps:
+      # 1. Repository se code checkout karna
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Java setup karna (Kuch Flutter plugins ke liye zaroori hai)
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Flutter SDK setup karna
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x' # Apni zaroorat ke mutabik version change kar sakte hain
+          channel: 'stable'
+          cache: true
+
+      # 4. Project ki pub dependencies get karna
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # 5. Pods install karna aur iOS build bina code-sign ke ready karna
+      - name: Build iOS Application (No Code Sign)
+        run: |
+          flutter build ios --release --no-codesign
+
+      # 6. Runner.app ko AltStore ke liye .ipa format me convert karna
+      - name: Package Unsigned IPA for AltStore
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r AltStore-Runner.ipa Payload
+          rm -rf Payload
+
+      # 7. Final .ipa file ko GitHub Artifacts me upload karna (Jahan se aap download karenge)
+      - name: Upload IPA Artifact
+        uses: actions/artifacts@v4
+        with:
+          name: ios-testing-ipa
+          path: AltStore-Runner.ipa
+          if-no-files-found: error
