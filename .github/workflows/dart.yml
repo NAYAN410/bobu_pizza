@@ -33,9 +33,6 @@ jobs:
         working-directory: ios
         run: pod repo update
 
-      - name: Generate iOS Files
-        run: flutter build ios --config-only
-
       - name: Build Unsigned Runner.app
         run: |
           xcodebuild \
@@ -43,20 +40,21 @@ jobs:
             -scheme Runner \
             -sdk iphoneos \
             -configuration Release \
-            -archivePath build/Runner.xcarchive \
-            archive \
+            -derivedDataPath build/ios \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
+            DEVELOPMENT_TEAM="" \
+            build
 
-      - name: Create IPA Structure
+      - name: Create Payload Folder
         run: |
           mkdir -p Payload
-          cp -R build/Runner.xcarchive/Products/Applications/Runner.app Payload/
+          cp -R build/ios/Build/Products/Release-iphoneos/Runner.app Payload/
 
       - name: Create IPA
-        run: zip -r FlutterIpaExport.ipa Payload
+        run: |
+          zip -r FlutterIpaExport.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
