@@ -1,70 +1,130 @@
-name: iOS Unsigned IPA Build
+name: iOS unsigned device IPA (for AltServer)
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build Unsigned IPA
+  build-ios:
+    name: Build unsigned iOS device IPA
     runs-on: macos-latest
 
     steps:
-      # Checkout repository
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      # Setup Flutter
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          architecture: x64
 
-      # Show Flutter version
-      - name: Flutter Version
-        run: flutter --version
+      - name: Flutter Pub Get
+        run: flutter pub get
 
-      # Create .env file
-      - name: Create .env file
+      - name: Create .env File
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
           echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
 
-      # Install dependencies
-      - name: Install Dependencies
-        run: flutter pub get
-
-      # Clean old builds
-      - name: Flutter Clean
-        run: flutter clean
-
-      # Install CocoaPods
-      - name: Install CocoaPods
+      - name: Create GoogleService-Info.plist
         run: |
-          cd ios
-          pod install
-          cd ..
+          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
 
-      # Build iOS app without signing
-      - name: Build iOS (No Codesign)
-        run: flutter build ios --release --no-codesign
+      - name: Pod Repo Update
+        working-directory: ios
+        run: pod repo update
 
-      # Create IPA manually
-      - name: Create IPA
+      - name: Disable Code Signing (robust)
         run: |
-          mkdir -p Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
-          cd Payload
-          zip -r ../BobuPizza.ipa .
-          cd ..
+          cp ios/Runner.xcodeproj/project.pbxproj ios/Runner.xcodeproj/project.pbxproj.bak || true
+          perl -0777 -pe '
+            s/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g;
+            s/CODE_SIGN_STYLE = [^;]*;/CODE_SIGN_STYLE = Manual;/g;
+            s/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g;
+            s/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g;
+            s/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g;
+            s/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g;
+          ' -i ios/Runner.xcodeproj/project.pbxproj || true
 
-      # Upload IPA artifact
-      - name: Upload IPA Artifact
+      - name: Show signing-related settings (diagnostic)
+        run: |
+          echo "---- DEVELOPMENT_TEAM occurrences ----"
+          grep -n "DEVELOPMENT_TEAM" ios/Runner.xcodeproj/project.pbxproj || true
+          echo "---- CODE_SIGN_STYLE occurrences ----"
+          grep -n "CODE_SIGN_STYLE" ios/Runner.xcodeproj/project.pbxproj || true
+          echo "---- CODE_SIGNING_ALLOWED occurrences ----"
+          grep -n "CODE_SIGNING_ALLOWED" ios/Runner.xcodeproj/project.pbxproj || true
+
+      - name: Build unsigned device IPA (for AltServer)
+        run: |
+          set -e
+          flutter clean
+          flutter pub get
+
+          # Prepare Flutter iOS project without codesign
+          flutter build ios --no-codesign --release
+
+          mkdir -p build/ios/archive
+          ARCHIVE_PATH="$PWD/build/ios/archive/Runner.xcarchive"
+          EXPORT_PATH="$PWD/build/ios/ipa"
+
+          # Archive the project while forcing no signing (may still warn)
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$ARCHIVE_PATH" \
+            archive \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" || true
+
+          # Prepare exportOptions.plist with signingStyle none
+          cat > exportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>compileBitcode</key><false/>
+            <key>method</key><string>development</string>
+            <key>signingStyle</key><string>none</string>
+            <key>stripSwiftSymbols</key><true/>
+          </dict>
+          </plist>
+          EOF
+
+          # Try exporting an unsigned IPA
+          mkdir -p "$EXPORT_PATH"
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist exportOptions.plist \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            || true
+
+          # If export produced an .ipa, copy it; otherwise fallback to packaging unsigned .app
+          if ls "$EXPORT_PATH"/*.ipa 1> /dev/null 2>&1; then
+            mkdir -p build/ios/ipa
+            cp "$EXPORT_PATH"/*.ipa build/ios/ipa/ || true
+          else
+            echo "No IPA produced by exportArchive — creating unsigned .ipa from .app as fallback"
+            if [ -d build/ios/iphoneos/Runner.app ]; then
+              mkdir -p build/ios/ipa/Payload
+              cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+              (cd build/ios/ipa && zip -r unsigned-device.ipa Payload) || true
+              # Move to top-level path
+              mkdir -p build/ios/ipa
+              mv build/ios/ipa/unsigned-device.ipa build/ios/ipa/ || true
+            else
+              echo "Fallback .app not found at build/ios/iphoneos/Runner.app"
+            fi
+          fi
+
+      - name: Upload Unsigned Device IPA
         uses: actions/upload-artifact@v4
         with:
-          name: BobuPizza-Unsigned-IPA
-          path: BobuPizza.ipa
-          retention-days: 7
+          name: unsigned-ios-device
+          path: build/ios/ipa/*.ipa
