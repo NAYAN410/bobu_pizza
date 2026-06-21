@@ -1,63 +1,38 @@
-name: iOS-ipa-build
+name: iOS Unsigned IPA Build
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-ios:
+  build:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.32.5'
 
-      - name: Flutter Pub Get
-        run: flutter pub get
-
-      - name: Create .env File
+      - name: Flutter Clean
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
-          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
+          flutter clean
+          flutter pub get
 
-      - name: Create GoogleService-Info.plist
+      - name: Install Pods
         run: |
-          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
+          cd ios
+          rm -rf Pods
+          rm -rf Podfile.lock
+          pod repo update
+          pod install
 
-      - name: Pod Repo Update
-        working-directory: ios
-        run: pod repo update
-
-      - name: Build Unsigned Runner.app
-        run: |
-          xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -sdk iphoneos \
-            -configuration Release \
-            -derivedDataPath build/ios \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            build
-
-      - name: Create Payload Folder
-        run: |
-          mkdir -p Payload
-          cp -R build/ios/Build/Products/Release-iphoneos/Runner.app Payload/
-
-      - name: Create IPA
-        run: |
-          zip -r FlutterIpaExport.ipa Payload
+      - name: Build IPA
+        run: flutter build ipa --release --no-codesign --verbose
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-ios-ipa
-          path: FlutterIpaExport.ipa
+          name: ios-ipa
+          path: build/ios/ipa/*.ipa
