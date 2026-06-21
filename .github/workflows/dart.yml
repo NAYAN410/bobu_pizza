@@ -43,10 +43,20 @@ jobs:
           pod install
         working-directory: ios
 
-      # ERROR FIX: Xcode Code-Signing restriction ko simulator framework target se completely bypass karna
+      # ERROR FIX: xcodebuild parameters ko command level par strict force bypass dena
       - name: Build Unsigned iOS Framework
         run: |
-          flutter build ios --release --simulator --no-codesign
+          flutter build ios --release --simulator --no-codesign \
+            --pub \
+            --build-number=1 \
+            --build-name=1.0.0 \
+            --extra-front-end-options=--no-implicit-dynamic-casts \
+            -- \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
 
       # 6. AltStore/AltServer compatible format (.ipa) me bundle ready karna
       - name: Create IPA Structure & Package
