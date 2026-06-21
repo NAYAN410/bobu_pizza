@@ -35,26 +35,25 @@ jobs:
         working-directory: ios
         run: pod repo update
 
-      - name: Disable Code Signing (robust)
+      - name: Force-disable code signing in project.pbxproj (CI injection)
         run: |
+          set -e
+          
+          # Backup original
           cp ios/Runner.xcodeproj/project.pbxproj ios/Runner.xcodeproj/project.pbxproj.bak || true
+
+          # Force CODE_SIGN_STYLE = Manual and clear signing identities/teams
           perl -0777 -pe '
-            s/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g;
-            s/CODE_SIGN_STYLE = [^;]*;/CODE_SIGN_STYLE = Manual;/g;
-            s/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g;
-            s/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g;
-            s/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g;
-            s/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g;
+            s/CODE_SIGN_STYLE\s*=\s*Automatic\s*;/CODE_SIGN_STYLE = Manual;/g;
+            s/DEVELOPMENT_TEAM\s*=\s*[^;]*;/DEVELOPMENT_TEAM = "";/g;
+            s/CODE_SIGNING_ALLOWED\s*=\s*YES;/CODE_SIGNING_ALLOWED = NO;/g;
+            s/CODE_SIGNING_REQUIRED\s*=\s*YES;/CODE_SIGNING_REQUIRED = NO;/g;
+            s/PROVISIONING_PROFILE_SPECIFIER\s*=\s*[^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g;
           ' -i ios/Runner.xcodeproj/project.pbxproj || true
 
-      - name: Show signing-related settings (diagnostic)
-        run: |
-          echo "---- DEVELOPMENT_TEAM occurrences ----"
-          grep -n "DEVELOPMENT_TEAM" ios/Runner.xcodeproj/project.pbxproj || true
-          echo "---- CODE_SIGN_STYLE occurrences ----"
-          grep -n "CODE_SIGN_STYLE" ios/Runner.xcodeproj/project.pbxproj || true
-          echo "---- CODE_SIGNING_ALLOWED occurrences ----"
-          grep -n "CODE_SIGNING_ALLOWED" ios/Runner.xcodeproj/project.pbxproj || true
+          echo "---- Signing diagnostics (after patching) ----"
+          grep -n "CODE_SIGN_STYLE" ios/Runner.xcodeproj/project.pbxproj | head -5 || true
+          grep -n "DEVELOPMENT_TEAM" ios/Runner.xcodeproj/project.pbxproj | head -5 || true
 
       - name: Build unsigned device IPA (for AltServer)
         run: |
@@ -69,7 +68,7 @@ jobs:
           ARCHIVE_PATH="$PWD/build/ios/archive/Runner.xcarchive"
           EXPORT_PATH="$PWD/build/ios/ipa"
 
-          # Archive the project while forcing no signing (may still warn)
+          # Archive the project while forcing no signing
           xcodebuild -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
@@ -115,9 +114,8 @@ jobs:
               mkdir -p build/ios/ipa/Payload
               cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
               (cd build/ios/ipa && zip -r unsigned-device.ipa Payload) || true
-              # Move to top-level path
               mkdir -p build/ios/ipa
-              mv build/ios/ipa/unsigned-device.ipa build/ios/ipa/ || true
+              mv build/ios/ipa/unsigned-device.ipa build/ios/ipa/ 2>/dev/null || true
             else
               echo "Fallback .app not found at build/ios/iphoneos/Runner.app"
             fi
