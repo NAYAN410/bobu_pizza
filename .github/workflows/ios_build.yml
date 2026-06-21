@@ -35,11 +35,9 @@ jobs:
         working-directory: ios
         run: pod repo update
 
-      - name: Patch project.pbxproj — disable all signing
+      - name: Patch project.pbxproj — disable ALL signing
         run: |
-          set -e
-          cp ios/Runner.xcodeproj/project.pbxproj ios/Runner.xcodeproj/project.pbxproj.bak
-
+          # Fix regular settings
           perl -0777 -pe '
             s/CODE_SIGN_STYLE\s*=\s*Automatic\s*;/CODE_SIGN_STYLE = Manual;/g;
             s/DEVELOPMENT_TEAM\s*=\s*[^;]*;/DEVELOPMENT_TEAM = "";/g;
@@ -49,59 +47,48 @@ jobs:
             s/CODE_SIGN_IDENTITY\s*=\s*[^;]*;/CODE_SIGN_IDENTITY = "";/g;
           ' -i ios/Runner.xcodeproj/project.pbxproj
 
-          echo "---- Signing patch applied ----"
-          grep -n "CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -5 || true
+          # Also fix the sdk-specific signing lines like:
+          # "CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+          perl -0777 -pe '
+            s/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]"\s*=\s*[^;]*;/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";/g;
+          ' -i ios/Runner.xcodeproj/project.pbxproj
 
-      - name: Build iOS with xcodebuild directly (no flutter build)
+          echo "---- Signing diagnostics ----"
+          grep -n "CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -10 || true
+          grep -n "DEVELOPMENT_TEAM"   ios/Runner.xcodeproj/project.pbxproj | head -5  || true
+
+      - name: Build Flutter iOS (no codesign)
         run: |
-          set -e
-
-          # Generate Flutter files first (no xcode involved)
           flutter pub get
-          dart run flutter_launcher_icons 2>/dev/null || true
+          flutter build ios --release --no-codesign 2>&1 || true
 
-          # Let Flutter generate its xcconfig and plugin registrant
-          flutter build ios --config-only 2>/dev/null || true
-
-          DERIVED_DATA="$PWD/build/ios/DerivedData"
-
-          # Build directly with xcodebuild, force all signing off at CLI level
-          xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath "$DERIVED_DATA" \
-            FLUTTER_BUILD_MODE=release \
-            FLUTTER_ROOT="$(flutter --version 2>/dev/null | head -1 || echo '')" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            build 2>&1 | tail -50
-
+          echo ""
           echo "---- Searching for Runner.app ----"
-          find "$DERIVED_DATA" -name "Runner.app" -type d 2>/dev/null
+          find "$PWD/build" -name "Runner.app" -type d 2>/dev/null || echo "Not found in build/"
 
       - name: Package unsigned IPA
         run: |
           set -e
 
-          DERIVED_DATA="$PWD/build/ios/DerivedData"
-          APP_PATH=$(find "$DERIVED_DATA" -name "Runner.app" -type d | grep -v simulator | head -1)
+          APP_PATH=$(find "$PWD/build" -name "Runner.app" -type d 2>/dev/null | head -1)
 
           if [ -z "$APP_PATH" ]; then
             echo "❌ Runner.app not found!"
-            find "$DERIVED_DATA" -type d -name "*.app" | head -10 || true
+            echo "---- build/ contents ----"
+            find "$PWD/build" -type d | head -30 || true
             exit 1
           fi
 
           APP_SIZE=$(du -sh "$APP_PATH" | cut -f1)
           echo "✅ Runner.app at: $APP_PATH"
           echo "✅ Size: $APP_SIZE"
+
+          # Fail if app is suspiciously small (means empty)
+          APP_BYTES=$(du -sk "$APP_PATH" | cut -f1)
+          if [ "$APP_BYTES" -lt 10000 ]; then
+            echo "❌ Runner.app is too small ($APP_BYTES KB) — build likely failed silently"
+            exit 1
+          fi
 
           IPA_DIR="$PWD/build/ios/ipa"
           mkdir -p "$IPA_DIR/Payload"
