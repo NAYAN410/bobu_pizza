@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants.dart';
 import '../../services/supabase_service.dart';
 import 'package:intl/intl.dart';
+import '../order_success_screen.dart';
 
 class OrdersTab extends StatefulWidget {
   const OrdersTab({super.key});
@@ -126,11 +127,27 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
     final items = order['order_items'] as List;
     final date = DateTime.parse(order['created_at']).toLocal();
     final formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(date);
-    final status = order['status'].toString().toUpperCase().replaceAll('_', ' ');
+    final status = order['status'].toString();
+    final isActive = status != 'delivered' && status != 'cancelled';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
+    return GestureDetector(
+      onTap: isActive ? () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OrderSuccessScreen(
+              orderData: {
+                'id': order['id'],
+                'delivery_pin': order['delivery_pin'],
+                'total': order['total_amount'],
+              },
+            ),
+          ),
+        );
+      } : null,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),

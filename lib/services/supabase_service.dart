@@ -81,7 +81,7 @@ class SupabaseService {
   }
 
   // Order Methods
-  static Future<void> placeOrder({
+  static Future<Map<String, dynamic>> placeOrder({
     required String address,
     required String mobile,
     required String paymentMode,
@@ -102,6 +102,9 @@ class SupabaseService {
     final randomStr = DateTime.now().millisecondsSinceEpoch.toString().substring(8);
     final customOrderId = "BB$dateStr$randomStr";
 
+    // Generate 6-digit random PIN
+    final deliveryPin = (100000 + (DateTime.now().microsecondsSinceEpoch % 900000)).toString();
+
     // 1. Insert order
     await client.from('orders').insert({
       'id': customOrderId,
@@ -115,6 +118,7 @@ class SupabaseService {
       'total_amount': totalAmount,
       'status': 'pending',
       'coupon_id': couponId,
+      'delivery_pin': deliveryPin,
     });
 
     // 2. Insert order items
@@ -134,6 +138,12 @@ class SupabaseService {
         'coupon_id': couponId,
       });
     }
+
+    return {
+      'id': customOrderId,
+      'delivery_pin': deliveryPin,
+      'total': totalAmount,
+    };
   }
 
   static Future<List<Map<String, dynamic>>> getUserOrders() async {
@@ -234,6 +244,7 @@ class SupabaseService {
           'id': user.id,
           'full_name': user.userMetadata?['full_name'] ?? user.email?.split('@').first ?? 'Guest',
           'phone': '',
+          'is_admin': false,
           'updated_at': DateTime.now().toIso8601String(),
         };
         await client.from('profiles').insert(newProfile);

@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
 import '../models/address_model.dart';
+import 'order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -152,7 +153,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       final totalAfterDiscount = CartService.subtotal - _discountAmount;
 
-      await SupabaseService.placeOrder(
+      final result = await SupabaseService.placeOrder(
         address: _selectedAddress!.fullAddress,
         mobile: _selectedAddress!.phoneNumber,
         paymentMode: _paymentMode,
@@ -164,7 +165,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (mounted) {
         await CartService.clearCart(); 
         setState(() => _isPlacingOrder = false);
-        _showSuccessDialog();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => OrderSuccessScreen(orderData: result))
+        );
       }
     } catch (e) {
       if (mounted) {

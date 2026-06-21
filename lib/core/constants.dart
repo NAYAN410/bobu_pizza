@@ -14,6 +14,12 @@ class AppColors {
     Color(0xFFFFF0DC),
     Color(0xFFFFE8C8),
   ];
+
+  static const List<Color> bgGradientDark = [
+    Color(0xFF1A1A1A),
+    Color(0xFF121212),
+    Color(0xFF000000),
+  ];
 }
 
 class AppPadding {

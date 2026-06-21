@@ -8,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/constants.dart';
 import '../services/cart_service.dart';
+import '../services/supabase_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -92,6 +93,10 @@ class _LoginScreenState extends State<LoginScreen>
         token: otp,
         type: OtpType.email,
       );
+      
+      // Ensure profile exists in 'profiles' table
+      await SupabaseService.getProfile();
+
       // Sync cart immediately after login
       await CartService.fetchCartFromDb();
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
@@ -136,6 +141,9 @@ class _LoginScreenState extends State<LoginScreen>
         idToken: idToken,
         accessToken: accessToken,
       );
+
+      // Ensure profile exists in 'profiles' table
+      await SupabaseService.getProfile();
 
       await CartService.fetchCartFromDb();
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
@@ -285,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.poppins(
                                     fontSize: 13 * scale,
-                                    color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5),
+                                    color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(128),
                                     height: 1.5,
                                   ),
                                 ),
@@ -378,7 +386,7 @@ class _LoginScreenState extends State<LoginScreen>
             height: 0.75,
             shadows: [
               Shadow(
-                color: AppColors.primary.withOpacity(0.15),
+                color: AppColors.primary.withAlpha(38),
                 offset: Offset(2 * scale, 3 * scale),
                 blurRadius: 6,
               ),
@@ -610,7 +618,7 @@ class _LoginScreenState extends State<LoginScreen>
               'https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png',
               height: 22 * scale,
               width: 22 * scale,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (context, error, stackTrace) =>
                   Icon(Icons.g_mobiledata, size: 22 * scale, color: isDark ? Colors.white : Colors.black),
             ),
             SizedBox(width: 12 * scale),
