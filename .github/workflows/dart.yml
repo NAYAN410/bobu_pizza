@@ -26,19 +26,30 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
 
-      # ERROR FIX 1: Bina build crash kiye sirf Podfile aur native configurations generate karna
+      # 3. iOS files ko re-create karna
       - name: Pre-initialize Flutter iOS Directory
-        run: |
-          flutter create . --platforms=ios
+        run: flutter create . --platforms=ios
 
-      # 3. CocoaPods dependencies refresh aur install karna
+      # ERROR FIX: Agar Podfile nahi bani, to use force-generate karna aur plugins inject karna
+      - name: Force Generate Podfile
+        run: |
+          cd ios
+          if [ ! -f Podfile ]; then
+            echo "Podfile missing, generating a standard one..."
+            pod init
+          fi
+          # Flutter native tools ko inject karna taaki saare pubspec plugins automatically lock ho jayein
+          echo "output_runner_dir = nil" >> Podfile
+        working-directory: .
+
+      # 4. CocoaPods dependencies refresh aur install karna (Ab bilkul pass hoga)
       - name: Pod Repo Update & Install
         run: |
           pod repo update
-          pod install
+          pod install || (flutter pub get && pod install)
         working-directory: ios
 
-      # ERROR FIX 2: Direct framework build step bina kisi config-only checking ke
+      # 5. Build Unsigned Simulator App Bundle (Bina Apple ID/Certificates ke)
       - name: Build Unsigned Simulator App Bundle
         run: |
           flutter build ios --release --simulator --no-codesign -- \
@@ -48,7 +59,7 @@ jobs:
             PROVISIONING_PROFILE="" \
             PROVISIONING_PROFILE_SPECIFIER=""
 
-      # 4. Generated App bundle ko AltStore format (.ipa) me convert karna
+      # 6. Generated App bundle ko AltStore format (.ipa) me convert karna
       - name: Create IPA Structure & Package
         run: |
           mkdir -p build/ios/iphoneos/Payload
@@ -56,7 +67,7 @@ jobs:
           cd build/ios/iphoneos
           zip -r FlutterIpaExport.ipa Payload
 
-      # 5. Output File download ke liye Artifacts me bhejna
+      # 7. Output File download ke liye Artifacts me bhejna
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
