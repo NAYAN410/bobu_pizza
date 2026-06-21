@@ -37,10 +37,15 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # ERROR FIX: Sirf environment ke andar wale sdk version ko target karega, flutter wale ko nahi छुएगा
+      # ERROR FIX 1: Environment constraint ko active Dart SDK (3.6.2) ke cross-compatible banana
       - name: Fix SDK Constraint in pubspec.yaml
         run: |
-          sed -i '' '/environment:/,/sdk:/ s/sdk:.*/sdk: ">=3.4.0 <4.0.0"/' pubspec.yaml
+          sed -i '' '/environment:/,/sdk:/ s/sdk:.*/sdk: ">=3.6.0 <4.0.0"/' pubspec.yaml
+
+      # ERROR FIX 2: flutter_lints dependency version mismatch ko clean solve karna
+      - name: Patch flutter_lints version for compatibility
+        run: |
+          sed -i '' 's/flutter_lints: .*/flutter_lints: any/' pubspec.yaml
 
       - name: Install Dependencies
         run: flutter pub get
