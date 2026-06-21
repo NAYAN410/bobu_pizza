@@ -26,18 +26,19 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
 
-      # 3. Native iOS workspace structure aur Podfile ready karna
-      - name: Auto-Generate iOS Workspace Config
-        run: flutter build ios --config-only
+      # ERROR FIX 1: Bina build crash kiye sirf Podfile aur native configurations generate karna
+      - name: Pre-initialize Flutter iOS Directory
+        run: |
+          flutter create . --platforms=ios
 
-      # 4. CocoaPods dependency install karna
+      # 3. CocoaPods dependencies refresh aur install karna
       - name: Pod Repo Update & Install
         run: |
           pod repo update
           pod install
         working-directory: ios
 
-      # ERROR FIX: Flutter CLI ko Simulator SDK force parameters ke sath run karna (Isse code-sign bypass ho jata hai)
+      # ERROR FIX 2: Direct framework build step bina kisi config-only checking ke
       - name: Build Unsigned Simulator App Bundle
         run: |
           flutter build ios --release --simulator --no-codesign -- \
@@ -47,7 +48,7 @@ jobs:
             PROVISIONING_PROFILE="" \
             PROVISIONING_PROFILE_SPECIFIER=""
 
-      # 5. Generated App bundle ko AltStore format (.ipa) me convert karna
+      # 4. Generated App bundle ko AltStore format (.ipa) me convert karna
       - name: Create IPA Structure & Package
         run: |
           mkdir -p build/ios/iphoneos/Payload
@@ -55,7 +56,7 @@ jobs:
           cd build/ios/iphoneos
           zip -r FlutterIpaExport.ipa Payload
 
-      # 6. Output File download ke liye Artifacts me bhejna
+      # 5. Output File download ke liye Artifacts me bhejna
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
