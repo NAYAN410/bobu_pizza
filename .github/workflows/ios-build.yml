@@ -3,7 +3,7 @@ name: Flutter iOS Unsigned IPA Build
 on:
   push:
     branches:
-      - master # Aapka active branch
+      - master
   workflow_dispatch:
 
 jobs:
@@ -12,29 +12,24 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # 1. Code pull karna
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Supabase credentials ke liye .env file banana (jaise aapke pubspec me .env assets configured hai)
       - name: Create .env file from Secrets
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
 
-      # 3. Google Sign-In ke liye plist file create karna
       - name: Create GoogleService-Info.plist
         run: |
           echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" > ios/Runner/GoogleService-Info.plist
 
-      # 4. Java Environment Setup karna
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 5. Flutter SDK environment ready karna (Stable Channel)
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -42,21 +37,18 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 6. AAPKI PUBSPEC KE LIYE ERROR FIX: Dart constraint ko automatic replace karna
+      # ERROR FIX: Sirf environment ke andar wale sdk version ko target karega, flutter wale ko nahi छुएगा
       - name: Fix SDK Constraint in pubspec.yaml
         run: |
-          sed -i '' 's/sdk: .*/sdk: ">=3.4.0 <4.0.0"/' pubspec.yaml
+          sed -i '' '/environment:/,/sdk:/ s/sdk:.*/sdk: ">=3.4.0 <4.0.0"/' pubspec.yaml
 
-      # 7. Pub packages download karna
       - name: Install Dependencies
         run: flutter pub get
 
-      # 8. Unsigned Release Build compile karna
       - name: Build iOS Application (No Code Sign)
         run: |
           flutter build ios --release --no-codesign
 
-      # 9. Runner.app bundle ko zip karke AltStore (.ipa) compatible banana
       - name: Package Unsigned IPA for AltStore
         run: |
           mkdir -p Payload
@@ -64,7 +56,6 @@ jobs:
           zip -r AltStore-Runner.ipa Payload
           rm -rf Payload
 
-      # 10. Final .ipa file ko upload karna (Actions tab se download karne ke liye)
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
