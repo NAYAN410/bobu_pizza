@@ -6,7 +6,7 @@ on:
 jobs:
   build-ios:
     name: 🎉 Unsigned iOS Build
-    runs-on: macos-13
+    runs-on: macos-14-large
 
     steps:
       - uses: actions/checkout@v3
