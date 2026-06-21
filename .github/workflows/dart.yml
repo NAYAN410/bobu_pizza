@@ -1,7 +1,7 @@
 name: iOS-ipa-build
 
 on:
-  workflow_dispatch: # Sirf manual trigger ke liye jaise aapne rakha tha
+  workflow_dispatch: # Manual trigger ke liye jaisa aapne set kiya tha
 
 jobs:
   build-ios:
@@ -9,51 +9,60 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4 # Latest version use karein (.gitignore bypass ke liye)
+      - uses: actions/checkout@v4 # Repository pull karna
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          architecture: arm64 # M1/M2 macs ke liye arm64 standard hai aajkal github runners par
+          architecture: arm64 # M-series Mac runners ke liye standardized architecture
 
-      # 1. Credentials injection (.env file configuration)
+      # 1. Credentials injection (.env file create karna)
       - name: Create .env File
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
           echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
 
-      # 2. Plist Injection (Bina base64 decode ke agar text file paste ki hai)
+      # 2. Plist file create karna
       - name: Create GoogleService-Info.plist
         run: |
           echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" > ios/Runner/GoogleService-Info.plist
 
-      # 3. Pub packages get karna
+      # 3. Pub packages download karna
       - name: Flutter Pub Get
         run: flutter pub get
 
-      # 4. CocoaPods setup aur Pod update process
-      - name: Pod Repo Update
+      # ERROR FIX: Pehle native ios config aur Podfile ko automatic generate karna
+      - name: Auto-Generate iOS Podfile & Workspace Config
+        run: flutter build ios --config-only
+
+      # 4. CocoaPods dependencies refresh aur install karna
+      - name: Pod Repo Update & Install
         run: |
           pod repo update
           pod install
         working-directory: ios
 
-      # NOTE: Hamne "Disable Code Signing" ka sed script step hata diya hai kyunki uski wajah se Xcode crash ho rha tha.
-
-      # 5. Pure Unsigned iOS framework compile karna
+      # 5. Pure Unsigned iOS Framework build karna (No Code Sign Xcode restriction fixed)
       - name: Build iOS App
         run: flutter build ios --release --no-codesign
 
-      # 6. AltStore/AltServer ke liye .ipa package bundle generate karna
-      - name: Create IPA Structure & Package
+      # 6. AltStore / AltServer compatible format (.ipa) bundle ready karna
+      - name: Create IPA Structure
         run: |
           mkdir -p build/ios/iphoneos/Payload
           cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+
+      - name: Remove macOS Metadata
+        run: |
+          find build/ios/iphoneos -name ".DS_Store" -delete
+
+      - name: Create IPA File
+        run: |
           cd build/ios/iphoneos
           zip -r FlutterIpaExport.ipa Payload
 
-      # 7. Downloadable application file ready karna
+      # 7. Downloadable build zip ko Artifact me upload karna
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
