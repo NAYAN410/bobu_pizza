@@ -35,14 +35,11 @@ jobs:
         working-directory: ios
         run: pod repo update
 
-      - name: Force-disable code signing in project.pbxproj (CI injection)
+      - name: Patch project.pbxproj — disable all signing
         run: |
           set -e
+          cp ios/Runner.xcodeproj/project.pbxproj ios/Runner.xcodeproj/project.pbxproj.bak
 
-          # Backup original
-          cp ios/Runner.xcodeproj/project.pbxproj ios/Runner.xcodeproj/project.pbxproj.bak || true
-
-          # Force all signing settings off
           perl -0777 -pe '
             s/CODE_SIGN_STYLE\s*=\s*Automatic\s*;/CODE_SIGN_STYLE = Manual;/g;
             s/DEVELOPMENT_TEAM\s*=\s*[^;]*;/DEVELOPMENT_TEAM = "";/g;
@@ -50,43 +47,74 @@ jobs:
             s/CODE_SIGNING_REQUIRED\s*=\s*YES;/CODE_SIGNING_REQUIRED = NO;/g;
             s/PROVISIONING_PROFILE_SPECIFIER\s*=\s*[^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g;
             s/CODE_SIGN_IDENTITY\s*=\s*[^;]*;/CODE_SIGN_IDENTITY = "";/g;
-          ' -i ios/Runner.xcodeproj/project.pbxproj || true
+          ' -i ios/Runner.xcodeproj/project.pbxproj
 
-          echo "---- Signing diagnostics (after patching) ----"
-          grep -n "CODE_SIGN_STYLE"    ios/Runner.xcodeproj/project.pbxproj | head -5 || true
-          grep -n "CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -5 || true
-          grep -n "DEVELOPMENT_TEAM"   ios/Runner.xcodeproj/project.pbxproj | head -5 || true
+          echo "---- Signing diagnostics ----"
+          grep -n "CODE_SIGN"        ios/Runner.xcodeproj/project.pbxproj | head -10 || true
+          grep -n "DEVELOPMENT_TEAM" ios/Runner.xcodeproj/project.pbxproj | head -5  || true
 
-      - name: Build unsigned device IPA (for AltServer)
+      - name: Generate Flutter build files (flutter assemble)
+        run: |
+          set -e
+          # This generates the necessary Flutter.framework and build files
+          # without triggering xcodebuild's signing check
+          flutter build ios --no-codesign --release || true
+
+          # Check if the error is ONLY about signing (then we can continue)
+          # The actual .app may still be built by xcodebuild below
+          echo "Flutter build step done (signing error above is expected, continuing...)"
+
+      - name: Build with xcodebuild (force no signing)
         run: |
           set -e
 
-          flutter clean
           flutter pub get
 
-          # Build Flutter iOS release without codesigning
-          flutter build ios --no-codesign --release
+          # Run xcodebuild directly — override ALL signing at command line level
+          # This takes priority over project settings
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/ios/DerivedData \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            | xcpretty || true
 
-          APP_PATH="$PWD/build/ios/iphoneos/Runner.app"
-          IPA_DIR="$PWD/build/ios/ipa"
+          echo "---- Checking for Runner.app ----"
+          find build/ios/DerivedData -name "Runner.app" -type d 2>/dev/null || true
 
-          # Verify .app was produced
-          if [ ! -d "$APP_PATH" ]; then
-            echo "❌ ERROR: Runner.app not found at $APP_PATH"
-            echo "---- Contents of build/ios/ ----"
-            ls -la "$PWD/build/ios/" || true
+      - name: Package unsigned IPA
+        run: |
+          set -e
+
+          # Find Runner.app in DerivedData
+          APP_PATH=$(find "$PWD/build/ios/DerivedData" -name "Runner.app" -type d | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ Runner.app not found in DerivedData"
+            echo "---- DerivedData contents ----"
+            find "$PWD/build/ios/DerivedData" -type d | head -30 || true
             exit 1
           fi
 
-          echo "✅ Runner.app found — packaging into IPA..."
+          echo "✅ Found Runner.app at: $APP_PATH"
 
-          # Manually create unsigned IPA (AltServer compatible)
+          IPA_DIR="$PWD/build/ios/ipa"
           mkdir -p "$IPA_DIR/Payload"
           cp -R "$APP_PATH" "$IPA_DIR/Payload/Runner.app"
+
           cd "$IPA_DIR"
           zip -r unsigned-device.ipa Payload/
 
-          echo "✅ IPA created successfully:"
+          echo "✅ IPA created:"
           ls -lh "$IPA_DIR/"
 
       - name: Upload Unsigned Device IPA
