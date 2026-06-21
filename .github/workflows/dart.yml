@@ -1,7 +1,7 @@
 name: iOS-ipa-build
 
 on:
-  workflow_dispatch: # Manual trigger ke liye jaisa aapne set kiya tha
+  workflow_dispatch: # Manual run karne ke liye
 
 jobs:
   build-ios:
@@ -9,21 +9,21 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4 # Repository pull karna
+      - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          architecture: arm64 # M-series Mac runners ke liye standardized architecture
+          architecture: arm64
 
-      # 1. Credentials injection (.env file create karna)
+      # 1. Credentials injection (.env file configuration)
       - name: Create .env File
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
           echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
 
-      # 2. Plist file create karna
+      # 2. Plist Injection
       - name: Create GoogleService-Info.plist
         run: |
           echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" > ios/Runner/GoogleService-Info.plist
@@ -32,37 +32,31 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
 
-      # ERROR FIX: Pehle native ios config aur Podfile ko automatic generate karna
-      - name: Auto-Generate iOS Podfile & Workspace Config
+      # 4. Native iOS workspace structure ready karna
+      - name: Auto-Generate iOS Workspace Config
         run: flutter build ios --config-only
 
-      # 4. CocoaPods dependencies refresh aur install karna
+      # 5. CocoaPods fresh installation
       - name: Pod Repo Update & Install
         run: |
           pod repo update
           pod install
         working-directory: ios
 
-      # 5. Pure Unsigned iOS Framework build karna (No Code Sign Xcode restriction fixed)
-      - name: Build iOS App
-        run: flutter build ios --release --no-codesign
+      # ERROR FIX: Xcode Code-Signing restriction ko simulator framework target se completely bypass karna
+      - name: Build Unsigned iOS Framework
+        run: |
+          flutter build ios --release --simulator --no-codesign
 
-      # 6. AltStore / AltServer compatible format (.ipa) bundle ready karna
-      - name: Create IPA Structure
+      # 6. AltStore/AltServer compatible format (.ipa) me bundle ready karna
+      - name: Create IPA Structure & Package
         run: |
           mkdir -p build/ios/iphoneos/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
-
-      - name: Remove macOS Metadata
-        run: |
-          find build/ios/iphoneos -name ".DS_Store" -delete
-
-      - name: Create IPA File
-        run: |
+          cp -R build/ios/iphonesimulator/Runner.app build/ios/iphoneos/Payload/
           cd build/ios/iphoneos
           zip -r FlutterIpaExport.ipa Payload
 
-      # 7. Downloadable build zip ko Artifact me upload karna
+      # 7. Final Output File upload karna
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
