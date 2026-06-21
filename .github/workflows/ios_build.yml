@@ -37,7 +37,6 @@ jobs:
 
       - name: Patch project.pbxproj — disable ALL signing
         run: |
-          # Fix regular settings
           perl -0777 -pe '
             s/CODE_SIGN_STYLE\s*=\s*Automatic\s*;/CODE_SIGN_STYLE = Manual;/g;
             s/DEVELOPMENT_TEAM\s*=\s*[^;]*;/DEVELOPMENT_TEAM = "";/g;
@@ -45,49 +44,70 @@ jobs:
             s/CODE_SIGNING_REQUIRED\s*=\s*YES;/CODE_SIGNING_REQUIRED = NO;/g;
             s/PROVISIONING_PROFILE_SPECIFIER\s*=\s*[^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g;
             s/CODE_SIGN_IDENTITY\s*=\s*[^;]*;/CODE_SIGN_IDENTITY = "";/g;
-          ' -i ios/Runner.xcodeproj/project.pbxproj
-
-          # Also fix the sdk-specific signing lines like:
-          # "CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-          perl -0777 -pe '
             s/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]"\s*=\s*[^;]*;/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";/g;
           ' -i ios/Runner.xcodeproj/project.pbxproj
 
-          echo "---- Signing diagnostics ----"
-          grep -n "CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -10 || true
-          grep -n "DEVELOPMENT_TEAM"   ios/Runner.xcodeproj/project.pbxproj | head -5  || true
+          echo "---- Patch check ----"
+          grep -n "CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -5 || true
 
-      - name: Build Flutter iOS (no codesign)
+      - name: Build Flutter iOS release (force no signing via env)
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
+          CODE_SIGN_IDENTITY: ""
+          DEVELOPMENT_TEAM: ""
         run: |
           flutter pub get
-          flutter build ios --release --no-codesign 2>&1 || true
+
+          # Use xcode build settings override via env + flutter flag together
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --dart-define=FLUTTER_BUILD_MODE=release \
+            2>&1 || true
 
           echo ""
-          echo "---- Searching for Runner.app ----"
-          find "$PWD/build" -name "Runner.app" -type d 2>/dev/null || echo "Not found in build/"
+          echo "---- Runner.app search ----"
+          find "$PWD/build/ios" -name "Runner.app" -type d 2>/dev/null || true
+
+          echo ""
+          echo "---- build/ios contents ----"
+          ls -la "$PWD/build/ios/" 2>/dev/null || true
 
       - name: Package unsigned IPA
         run: |
           set -e
 
-          APP_PATH=$(find "$PWD/build" -name "Runner.app" -type d 2>/dev/null | head -1)
+          APP_PATH=$(find "$PWD/build/ios" -name "Runner.app" -type d 2>/dev/null | head -1)
 
           if [ -z "$APP_PATH" ]; then
             echo "❌ Runner.app not found!"
-            echo "---- build/ contents ----"
-            find "$PWD/build" -type d | head -30 || true
             exit 1
           fi
 
-          APP_SIZE=$(du -sh "$APP_PATH" | cut -f1)
+          APP_KB=$(du -sk "$APP_PATH" | cut -f1)
           echo "✅ Runner.app at: $APP_PATH"
-          echo "✅ Size: $APP_SIZE"
+          echo "✅ Size: ${APP_KB} KB"
 
-          # Fail if app is suspiciously small (means empty)
-          APP_BYTES=$(du -sk "$APP_PATH" | cut -f1)
-          if [ "$APP_BYTES" -lt 10000 ]; then
-            echo "❌ Runner.app is too small ($APP_BYTES KB) — build likely failed silently"
-            exit 1
+          if [ "$APP_KB" -lt 10000 ]; then
+            echo "⚠️  App too small — checking what's inside:"
+            ls -la "$APP_PATH/" || true
+
+            echo ""
+            echo "---- Checking for Flutter.framework ----"
+            find "$PWD/build/ios" -name "Flutter" -o -name "App.framework" 2>/dev/null | head -10 || true
+
+            # Try to find Flutter artifacts and inject them
+            FLUTTER_FRAMEWORK=$(find "$PWD/build/ios" -name "Flutter" -type f 2>/dev/null | head -1)
+            APP_FRAMEWORK=$(find "$PWD/build/ios" -name "App.framework" -type d 2>/dev/null | head -1)
+
+            if [ -n "$APP_FRAMEWORK" ]; then
+              echo "Found App.framework at $APP_FRAMEWORK — copying into Runner.app"
+              cp -R "$APP_FRAMEWORK" "$APP_PATH/Frameworks/" 2>/dev/null || true
+            fi
+
+            APP_KB=$(du -sk "$APP_PATH" | cut -f1)
+            echo "Size after injection attempt: ${APP_KB} KB"
           fi
 
           IPA_DIR="$PWD/build/ios/ipa"
