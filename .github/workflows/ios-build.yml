@@ -24,7 +24,6 @@ jobs:
         run: |
           echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}" > ios/Runner/GoogleService-Info.plist
 
-      # Node Warning fix karne ke liye artifacts v4 explicit config
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -34,9 +33,14 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.x' # <--- ERROR FIXED: Version badal kar 3.27.x kar diya hai jo Dart 3.12+ ko support karega
+          flutter-version: '3.27.x'
           channel: 'stable'
           cache: true
+
+      # ERROR FIX: GitHub Runner par pubspec.yaml ki line ko modify karna
+      - name: Fix SDK Constraint in pubspec.yaml
+        run: |
+          sed -i '' 's/sdk: .*/sdk: ">=3.0.0 <4.0.0"/' pubspec.yaml
 
       - name: Install Dependencies
         run: flutter pub get
