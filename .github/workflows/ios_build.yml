@@ -55,23 +55,25 @@ jobs:
           flutter pub get
           flutter build ios --release --no-codesign || true
 
-          echo "---- Runner.app size check ----"
-          du -sh build/ios/iphoneos/Runner.app || true
+          echo "---- Searching for Runner.app ----"
+          find "$PWD/build/ios" -name "Runner.app" -type d 2>/dev/null || true
 
       - name: Package unsigned IPA
         run: |
           set -e
 
-          APP_PATH="$PWD/build/ios/iphoneos/Runner.app"
+          # Find Runner.app anywhere under build/ios
+          APP_PATH=$(find "$PWD/build/ios" -name "Runner.app" -type d | head -1)
 
-          if [ ! -d "$APP_PATH" ]; then
-            echo "❌ Runner.app not found!"
-            ls -la "$PWD/build/ios/" || true
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ Runner.app not found anywhere!"
+            find "$PWD/build/ios" -type d | head -20 || true
             exit 1
           fi
 
           APP_SIZE=$(du -sh "$APP_PATH" | cut -f1)
-          echo "✅ Runner.app found — Size: $APP_SIZE"
+          echo "✅ Runner.app found at: $APP_PATH"
+          echo "✅ Size: $APP_SIZE"
 
           IPA_DIR="$PWD/build/ios/ipa"
           mkdir -p "$IPA_DIR/Payload"
