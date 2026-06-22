@@ -20,7 +20,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
-  static const double _navBarHeight = 75.0;
+  static const double _navBarHeight = 70.0;
 
   late AnimationController _cartBarController;
   late Animation<Offset> _cartBarSlide;
@@ -90,7 +90,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   void _onItemTapped(int index) {
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
-    HapticFeedback.mediumImpact();
+    HapticFeedback.selectionClick();
 
     final items = CartService.cartItemsNotifier.value;
     if (index == 2) {
@@ -114,7 +114,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      extendBody: true, // Required for glass effect to show content behind
+      extendBody: true, 
       backgroundColor: theme.scaffoldBackgroundColor,
       body: IndexedStack(
         index: _selectedIndex,
@@ -130,7 +130,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         alignment: Alignment.bottomCenter,
         children: [
           _buildMiniCartBar(),
-          _buildLiquidNavBar(isDark),
+          _buildGlassNavBar(isDark),
         ],
       ),
     );
@@ -144,25 +144,25 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         final int totalItems = items.fold<int>(0, (sum, item) => sum + item.quantity);
 
         return Padding(
-          padding: const EdgeInsets.only(bottom: _navBarHeight + 15),
+          padding: const EdgeInsets.only(bottom: _navBarHeight + 25),
           child: SlideTransition(
             position: _cartBarSlide,
             child: FadeTransition(
               opacity: _cartBarFade,
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
+                margin: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [AppColors.primary, AppColors.primary.withAlpha(200)],
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(60), blurRadius: 16, offset: const Offset(0, 6))],
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(60), blurRadius: 20, offset: const Offset(0, 8))],
                 ),
                 child: InkWell(
                   onTap: () => _onItemTapped(2),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                     child: Row(
                       children: [
                         ScaleTransition(
@@ -170,24 +170,14 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(color: Colors.white.withAlpha(40), shape: BoxShape.circle),
-                            child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 18),
+                            child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 20),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 14),
                         Text('$totalItems item${totalItems > 1 ? 's' : ''} in cart',
-                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                         const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                          child: Row(
-                            children: [
-                              Text('View Cart', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_ios_rounded, color: AppColors.primary, size: 10),
-                            ],
-                          ),
-                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 14),
                       ],
                     ),
                   ),
@@ -200,57 +190,50 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildLiquidNavBar(bool isDark) {
+  Widget _buildGlassNavBar(bool isDark) {
     final double sw = MediaQuery.of(context).size.width;
-    final double itemWidth = sw / _navItems.length;
-    final bool isIOS = Platform.isIOS;
+    final double itemWidth = (sw - 40) / _navItems.length;
 
     return Container(
-      height: _navBarHeight + 20,
-      width: sw,
-      padding: const EdgeInsets.fromLTRB(10, 0, 10, 15),
+      height: _navBarHeight,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 25),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(35),
         child: Stack(
           children: [
-            // Background Layer
-            if (isIOS)
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.black.withAlpha(180) : Colors.white.withAlpha(180),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.white.withAlpha(isDark ? 20 : 80), width: 1),
-                  ),
-                ),
-              )
-            else
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 20), blurRadius: 20, offset: const Offset(0, 4))],
-                ),
-              ),
-
-            // Liquid Moving Indicator
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.elasticOut,
-              left: (_selectedIndex * itemWidth) + (itemWidth / 2) - 30 - 10,
-              top: 10,
+            // Frosted Glass Layer
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Container(
-                width: 60,
-                height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(isIOS ? 30 : 20),
-                  borderRadius: BorderRadius.circular(20),
+                  color: isDark ? Colors.black.withAlpha(160) : Colors.white.withAlpha(140),
+                  borderRadius: BorderRadius.circular(35),
+                  border: Border.all(color: Colors.white.withAlpha(isDark ? 20 : 100), width: 1.2),
                 ),
               ),
             ),
 
-            // Navigation Items
+            // Sliding Liquid Indicator
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.elasticOut,
+              left: (_selectedIndex * itemWidth) + 5,
+              top: 5,
+              child: Container(
+                width: itemWidth - 10,
+                height: _navBarHeight - 10,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withAlpha(30) : AppColors.primary.withAlpha(30),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    if (!isDark)
+                      BoxShadow(color: AppColors.primary.withAlpha(20), blurRadius: 10, spreadRadius: 2)
+                  ],
+                ),
+              ),
+            ),
+
+            // Tab Items
             Row(
               children: List.generate(_navItems.length, (index) {
                 final item = _navItems[index];
@@ -263,22 +246,26 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.all(8),
+                        AnimatedScale(
+                          duration: const Duration(milliseconds: 400),
+                          scale: isSelected ? 1.1 : 1.0,
                           child: Icon(
                             isSelected ? item.activeIcon : item.icon,
-                            color: isSelected ? AppColors.primary : (isDark ? Colors.white38 : Colors.grey[400]),
-                            size: 24,
+                            color: isSelected 
+                                ? (isDark ? Colors.white : AppColors.primary) 
+                                : (isDark ? Colors.white38 : Colors.grey[600]),
+                            size: 26,
                           ),
                         ),
+                        if (isSelected)
+                          const SizedBox(height: 2),
                         AnimatedOpacity(
                           duration: const Duration(milliseconds: 300),
                           opacity: isSelected ? 1.0 : 0.0,
                           child: Text(
                             item.label,
                             style: GoogleFonts.poppins(
-                              color: AppColors.primary,
+                              color: isDark ? Colors.white : AppColors.primary,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
