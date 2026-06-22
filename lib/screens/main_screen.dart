@@ -20,7 +20,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
-  static const double _navBarHeight = 70.0;
+  static const double _navBarHeight = 65.0;
 
   late AnimationController _cartBarController;
   late Animation<Offset> _cartBarSlide;
@@ -130,7 +130,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         alignment: Alignment.bottomCenter,
         children: [
           _buildMiniCartBar(),
-          _buildGlassNavBar(isDark),
+          _buildLiquidGlassNavBar(isDark),
         ],
       ),
     );
@@ -144,7 +144,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         final int totalItems = items.fold<int>(0, (sum, item) => sum + item.quantity);
 
         return Padding(
-          padding: const EdgeInsets.only(bottom: _navBarHeight + 25),
+          padding: const EdgeInsets.only(bottom: _navBarHeight + 40),
           child: SlideTransition(
             position: _cartBarSlide,
             child: FadeTransition(
@@ -190,50 +190,60 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildGlassNavBar(bool isDark) {
+  Widget _buildLiquidGlassNavBar(bool isDark) {
     final double sw = MediaQuery.of(context).size.width;
-    final double itemWidth = (sw - 40) / _navItems.length;
+    final double paddingHorizontal = 25.0;
+    final double barWidth = sw - (paddingHorizontal * 2);
+    final double itemWidth = barWidth / _navItems.length;
 
     return Container(
       height: _navBarHeight,
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 25),
+      margin: EdgeInsets.fromLTRB(paddingHorizontal, 0, paddingHorizontal, 35),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(35),
+        borderRadius: BorderRadius.circular(40),
         child: Stack(
+          alignment: Alignment.center,
           children: [
-            // Frosted Glass Layer
+            // Frosted Glass Effect (Transparent & Blur)
             BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.black.withAlpha(160) : Colors.white.withAlpha(140),
-                  borderRadius: BorderRadius.circular(35),
-                  border: Border.all(color: Colors.white.withAlpha(isDark ? 20 : 100), width: 1.2),
+                  // Making it more transparent to give real "Glass" feel
+                  color: isDark ? Colors.white.withAlpha(15) : Colors.black.withAlpha(10),
+                  borderRadius: BorderRadius.circular(40),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withAlpha(30) : Colors.white.withAlpha(100), 
+                    width: 0.8
+                  ),
                 ),
               ),
             ),
 
-            // Sliding Liquid Indicator
+            // Sliding Liquid Indicator (Longer & Pill shaped)
             AnimatedPositioned(
-              duration: const Duration(milliseconds: 500),
+              duration: const Duration(milliseconds: 550),
               curve: Curves.elasticOut,
-              left: (_selectedIndex * itemWidth) + 5,
-              top: 5,
+              // Indicator is wider than the icon space
+              left: (_selectedIndex * itemWidth) + (itemWidth / 2) - 35, 
               child: Container(
-                width: itemWidth - 10,
-                height: _navBarHeight - 10,
+                width: 70, // Increased length
+                height: 45,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withAlpha(30) : AppColors.primary.withAlpha(30),
-                  borderRadius: BorderRadius.circular(30),
+                  color: AppColors.primary.withAlpha(35),
+                  borderRadius: BorderRadius.circular(25),
                   boxShadow: [
-                    if (!isDark)
-                      BoxShadow(color: AppColors.primary.withAlpha(20), blurRadius: 10, spreadRadius: 2)
+                    BoxShadow(
+                      color: AppColors.primary.withAlpha(20),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                    )
                   ],
                 ),
               ),
             ),
 
-            // Tab Items
+            // Icons - Perfectly Vertically Centered
             Row(
               children: List.generate(_navItems.length, (index) {
                 final item = _navItems[index];
@@ -243,35 +253,35 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                   child: GestureDetector(
                     onTap: () => _onItemTapped(index),
                     behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AnimatedScale(
-                          duration: const Duration(milliseconds: 400),
-                          scale: isSelected ? 1.1 : 1.0,
-                          child: Icon(
-                            isSelected ? item.activeIcon : item.icon,
-                            color: isSelected 
-                                ? (isDark ? Colors.white : AppColors.primary) 
-                                : (isDark ? Colors.white38 : Colors.grey[600]),
-                            size: 26,
-                          ),
-                        ),
-                        if (isSelected)
-                          const SizedBox(height: 2),
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          opacity: isSelected ? 1.0 : 0.0,
-                          child: Text(
-                            item.label,
-                            style: GoogleFonts.poppins(
-                              color: isDark ? Colors.white : AppColors.primary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center, // Vertically centered
+                        children: [
+                          AnimatedScale(
+                            duration: const Duration(milliseconds: 300),
+                            scale: isSelected ? 1.1 : 1.0,
+                            child: Icon(
+                              isSelected ? item.activeIcon : item.icon,
+                              color: isSelected ? AppColors.primary : (isDark ? Colors.white70 : Colors.grey[700]),
+                              size: 26,
                             ),
                           ),
-                        ),
-                      ],
+                          // Label is hidden or very tight to keep icon centered
+                          if (isSelected)
+                            AnimatedOpacity(
+                              duration: const Duration(milliseconds: 300),
+                              opacity: 1.0,
+                              child: Text(
+                                item.label,
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.primary,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 );
