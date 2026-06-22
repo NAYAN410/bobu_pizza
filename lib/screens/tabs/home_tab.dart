@@ -456,20 +456,21 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                         child: Hero(
                           tag: 'pizza_home_${pizza.id}',
-                          child: Center(
-                            child: pizza.imageUrl.startsWith('http')
-                                ? Image.network(
-                                    pizza.imageUrl,
-                                    height: 150 * scale,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png', height: 150 * scale),
-                                  )
-                                : Image.asset(
-                                    'assets/images/pizza.png',
-                                    height: 150 * scale,
-                                    fit: BoxFit.contain,
-                                  ),
-                          ),
+                          child: pizza.imageUrl.startsWith('http')
+                              ? Image.network(
+                                  pizza.imageUrl,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover, // Poora fill karega
+                                  errorBuilder: (context, error, stackTrace) => 
+                                    Image.asset('assets/images/pizza.png', fit: BoxFit.cover),
+                                )
+                              : Image.asset(
+                                  'assets/images/pizza.png',
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
                       ),
                     ),

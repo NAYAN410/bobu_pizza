@@ -508,20 +508,21 @@ class _MenuTabState extends State<MenuTab> {
                   ),
                   child: Hero(
                     tag: 'pizza_${item.id}',
-                    child: Center(
-                      child: item.imageUrl.startsWith('http')
-                          ? Image.network(
-                              item.imageUrl,
-                              height: 150 * scale,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png', height: 150 * scale),
-                            )
-                          : Image.asset(
-                              'assets/images/pizza.png',
-                              height: 150 * scale,
-                              fit: BoxFit.contain,
-                            ),
-                    ),
+                    child: item.imageUrl.startsWith('http')
+                        ? Image.network(
+                            item.imageUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover, // Poora fill karega
+                            errorBuilder: (context, error, stackTrace) => 
+                              Image.asset('assets/images/pizza.png', fit: BoxFit.cover),
+                          )
+                        : Image.asset(
+                            'assets/images/pizza.png',
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                 ),
               ),
