@@ -54,8 +54,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   static const double _navBarHeight = 68.0;
   static const double _navBarHorizontalMargin = 20.0;
-  static const double _navBarBottomMargin = 28.0;
-  static const double _pillWidth = 68.0;
+  static const double _navBarBottomMargin = 12.0; // Lowered from 28.0 for better bottom positioning
+  static const double _pillWidth = 72.0; // Slightly wider pill for better look
   static const double _pillHeight = 46.0;
 
   late AnimationController _pillController;
@@ -319,56 +319,69 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           borderRadius: navBr,
           child: Stack(
             children: [
-              // ── [0] BLUR LAYER ──
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                child: Container(
-                  color: isDark 
-                      ? Colors.white.withAlpha(15) 
-                      : Colors.white.withAlpha(120),
+            // ── [0] BLUR LAYER ──
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 25, sigmaY: 20), // Optimized blur
+              child: Container(
+                color: isDark 
+                    ? Colors.white.withAlpha(8)  // Extremely low opacity for dark mode
+                    : Colors.white.withAlpha(45), // Crystal clear milk glass for light mode
+              ),
+            ),
+
+            // ── [1] Specular Rim & Border ──
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: navBr,
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withAlpha(15) // Thinner, subtle border
+                      : Colors.white.withAlpha(80),
+                  width: 0.6,
                 ),
               ),
+              child: const SizedBox.expand(),
+            ),
 
-              // ── [1] Specular Rim & Border ──
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: navBr,
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withAlpha(30)
-                        : Colors.white.withAlpha(100),
-                    width: 0.8,
+            // ── [2] LIQUID PILL ──
+            AnimatedBuilder(
+              animation: _pillController,
+              builder: (context, _) {
+                final double visualPos = _isDragging
+                    ? (_selectedIndex + _dragOffsetFraction)
+                    : _pillPosition.value;
+                final double pillLeft =
+                    (visualPos * itemWidth) + (itemWidth / 2) - (_pillWidth / 2);
+
+                return Positioned(
+                  left: pillLeft.clamp(0.0, barWidth - _pillWidth),
+                  top: (_navBarHeight - _pillHeight) / 2,
+                  child: _LiquidPill(
+                    width: _pillWidth,
+                    height: _pillHeight,
+                    color: AppColors.primary,
+                    isDark: isDark,
                   ),
+                );
+              },
+            ),
+
+            // ── [3] Vertical gradient sheen ──
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withAlpha(isDark ? 10 : 30),
+                    Colors.transparent,
+                  ],
                 ),
-                child: const SizedBox.expand(),
               ),
-
-              // ── [2] LIQUID PILL ──
-              AnimatedBuilder(
-                animation: _pillController,
-                builder: (context, _) {
-                  final double visualPos = _isDragging
-                      ? (_selectedIndex + _dragOffsetFraction)
-                      : _pillPosition.value;
-                  final double pillLeft =
-                      (visualPos * itemWidth) + (itemWidth / 2) - (_pillWidth / 2);
-
-                  return Positioned(
-                    left: pillLeft.clamp(0.0, barWidth - _pillWidth),
-                    top: (_navBarHeight - _pillHeight) / 2,
-                    child: _LiquidPill(
-                      width: _pillWidth,
-                      height: _pillHeight,
-                      color: AppColors.primary,
-                      isDark: isDark,
-                    ),
-                  );
-                },
-              ),
-
-              // ── [3] ICONS ──
-              Row(
-                children: List.generate(_navItems.length, (index) {
+            ),
+            // ── [4] ICONS ──
+            Row(
+              children: List.generate(_navItems.length, (index) {
                   final item = _navItems[index];
                   final bool isSelected = _selectedIndex == index;
 
@@ -535,12 +548,12 @@ class _LiquidPill extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: isDark
                       ? [
-                          color.withOpacity(0.28),
-                          color.withOpacity(0.14),
+                          color.withAlpha(70),
+                          color.withAlpha(35),
                         ]
                       : [
-                          color.withOpacity(0.22),
-                          color.withOpacity(0.10),
+                          color.withAlpha(55),
+                          color.withAlpha(25),
                         ],
                 ),
               ),
@@ -551,12 +564,12 @@ class _LiquidPill extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: br,
                 border: Border.all(
-                  color: color.withOpacity(isDark ? 0.40 : 0.30),
+                  color: color.withAlpha(isDark ? 100 : 75),
                   width: 0.8,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withOpacity(0.22),
+                    color: color.withAlpha(55),
                     blurRadius: 12,
                     spreadRadius: 0,
                   ),
