@@ -55,14 +55,28 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text('My Orders', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        bottom: TabBar(
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
+    return Column(
+      children: [
+        // ── Custom AppBar ──
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              'My Orders',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+          ),
+        ),
+        // ── Tab Bar ──
+        TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
@@ -73,16 +87,17 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
             Tab(text: 'Past Orders'),
           ],
         ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildOrderList(true, isDark),
-                _buildOrderList(false, isDark),
-              ],
-            ),
+        // ── Tab Content ──
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildOrderList(true, isDark),
+              _buildOrderList(false, isDark),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

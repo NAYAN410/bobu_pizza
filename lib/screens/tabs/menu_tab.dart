@@ -117,156 +117,148 @@ class _MenuTabState extends State<MenuTab> {
     final sw = MediaQuery.of(context).size.width;
     final double contentWidth = sw.clamp(0.0, 500.0);
     final double scale = (contentWidth / 375).clamp(0.85, 1.1);
-    final double bottomPad = MediaQuery.of(context).padding.bottom + 80;
+    final double bottomPad = MediaQuery.of(context).padding.bottom + 100;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-      );
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header ──
-            Padding(
-              padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 0),
-              child: Text(
-                'Our Menu',
-                style: GoogleFonts.poppins(
-                  fontSize: 24 * scale,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF2D1A0E),
-                ),
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Header ──
+        Padding(
+          padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 0),
+          child: Text(
+            'Our Menu',
+            style: GoogleFonts.poppins(
+              fontSize: 24 * scale,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF2D1A0E),
             ),
-            Padding(
-              padding: EdgeInsets.only(left: 20 * scale, right: 20 * scale, bottom: 14 * scale),
-              child: Text(
-                'Explore our wide range of pizzas, handcrafted with fresh dough, premium cheeses, and locally sourced toppings.',
-                style: GoogleFonts.poppins(
-                  fontSize: 13 * scale,
-                  color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45),
-                ),
-              ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.only(left: 20 * scale, right: 20 * scale, bottom: 14 * scale),
+          child: Text(
+            'Explore our wide range of pizzas, handcrafted with fresh dough, premium cheeses, and locally sourced toppings.',
+            style: GoogleFonts.poppins(
+              fontSize: 13 * scale,
+              color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45),
             ),
+          ),
+        ),
 
-            // ── Category chips ──
-            SizedBox(
-              height: 42 * scale,
-              child: ListView.builder(
-                padding: EdgeInsets.only(left: 20 * scale),
-                scrollDirection: Axis.horizontal,
-                itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final isActive = index == _selectedCategoryIndex;
-                  return GestureDetector(
-                    onTap: () => _onCategoryTapped(index),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
-                      margin: EdgeInsets.only(right: 10 * scale),
-                      padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
-                      decoration: BoxDecoration(
-                        color: isActive ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isActive ? AppColors.primary : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
-                          width: 1.2,
-                        ),
-                        boxShadow: isActive
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(_categories[index].icon, style: TextStyle(fontSize: 14 * scale)),
-                          SizedBox(width: 6 * scale),
-                          Text(
-                            _categories[index].name,
-                            style: GoogleFonts.poppins(
-                              fontSize: 12 * scale,
-                              fontWeight: FontWeight.w600,
-                              color: isActive ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF2D1A0E)),
+        // ── Category chips ──
+        SizedBox(
+          height: 42 * scale,
+          child: ListView.builder(
+            padding: EdgeInsets.only(left: 20 * scale),
+            scrollDirection: Axis.horizontal,
+            itemCount: _categories.length,
+            itemBuilder: (context, index) {
+              final isActive = index == _selectedCategoryIndex;
+              return GestureDetector(
+                onTap: () => _onCategoryTapped(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  margin: EdgeInsets.only(right: 10 * scale),
+                  padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
+                  decoration: BoxDecoration(
+                    color: isActive ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isActive ? AppColors.primary : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
+                      width: 1.2,
+                    ),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
-                          ),
-                        ],
+                          ]
+                        : [],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_categories[index].icon, style: TextStyle(fontSize: 14 * scale)),
+                      SizedBox(width: 6 * scale),
+                      Text(
+                        _categories[index].name,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12 * scale,
+                          fontWeight: FontWeight.w600,
+                          color: isActive ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF2D1A0E)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+        SizedBox(height: 12 * scale),
+
+        // ── Item count ──
+        Padding(
+          padding: EdgeInsets.only(left: 20 * scale, bottom: 10 * scale),
+          child: Text(
+            '${_allItems.length} items',
+            style: GoogleFonts.poppins(
+              fontSize: 12 * scale,
+              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.4),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+
+        // ── List ──
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadMenuData,
+            color: AppColors.primary,
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.only(
+                left: 20 * scale,
+                right: 20 * scale,
+                bottom: bottomPad,
+              ),
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == _allItems.length) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24.0),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary.withOpacity(0.5),
                       ),
                     ),
                   );
-                },
-              ),
+                }
+                final item = _allItems[index];
+                return GestureDetector(
+                  onTap: () => _showPizzaDetails(context, item, scale, isDark),
+                  child: _buildMenuCard(item, scale, isDark),
+                );
+              },
             ),
-
-            SizedBox(height: 12 * scale),
-
-            // ── Item count ──
-            Padding(
-              padding: EdgeInsets.only(left: 20 * scale, bottom: 10 * scale),
-              child: Text(
-                '${_allItems.length} items',
-                style: GoogleFonts.poppins(
-                  fontSize: 12 * scale,
-                  color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.4),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-
-            // ── List ──
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadMenuData,
-                color: AppColors.primary,
-                backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: EdgeInsets.only(
-                    left: 20 * scale,
-                    right: 20 * scale,
-                    bottom: bottomPad,
-                  ),
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _allItems.length) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24.0),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.primary.withOpacity(0.5),
-                          ),
-                        ),
-                      );
-                    }
-                    final item = _allItems[index];
-                    return GestureDetector(
-                      onTap: () => _showPizzaDetails(context, item, scale, isDark),
-                      child: _buildMenuCard(item, scale, isDark),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 

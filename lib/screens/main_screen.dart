@@ -251,54 +251,46 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     final double barWidth = sw - (_navBarHorizontalMargin * 2);
 
     return Scaffold(
-      extendBody: true, // tabs render behind navbar → BackdropFilter sees them
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: const [
-          HomeTab(),
-          MenuTab(),
-          CartTab(),
-          OrdersTab(),
-          ProfileTab(),
+      body: Stack(
+        children: [
+          // Content Layer — tabs fill full screen
+          Positioned.fill(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: const [
+                HomeTab(),
+                MenuTab(),
+                CartTab(),
+                OrdersTab(),
+                ProfileTab(),
+              ],
+            ),
+          ),
+
+          // Floating UI Layer
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: mq.padding.bottom),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildMiniCartBar(),
+                  const SizedBox(height: 10),
+                  _buildLiquidGlassNavBar(isDark, barWidth),
+                  const SizedBox(height: _navBarBottomMargin),
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
-      // bottomNavigationBar just reserves bottom space + holds the floating UI
-      bottomNavigationBar: SizedBox(
-        height: _navBarHeight + _navBarBottomMargin + mq.padding.bottom,
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // Mini cart bar sits above the navbar
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _buildMiniCartBar(),
-            ),
-            // Liquid glass navbar
-            Positioned(
-              bottom: _navBarBottomMargin + mq.padding.bottom,
-              left: _navBarHorizontalMargin,
-              right: _navBarHorizontalMargin,
-              height: _navBarHeight,
-              child: _buildLiquidGlassNavBar(isDark, barWidth),
-            ),
-          ],
-        ),
       ),
     );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LIQUID GLASS NAVBAR WIDGET
-  //
-  // Layer order inside ClipRRect → Stack:
-  //   [0] BackdropFilter → transparent SizedBox.expand()  ← MUST be transparent
-  //   [1] Tint Container (color + border, NO blur)
-  //   [2] Top specular rim (1px gradient)
-  //   [3] Animated liquid pill
-  //   [4] Icons row
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildLiquidGlassNavBar(bool isDark, double barWidth) {
@@ -310,155 +302,118 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       onHorizontalDragStart: _onDragStart,
       onHorizontalDragUpdate: (d) => _onDragUpdate(d, barWidth),
       onHorizontalDragEnd: (d) => _onDragEnd(d, barWidth),
-      // ── ClipRRect here is fine because BackdropFilter is INSIDE it ──
-      // The clip just shapes the visual output of the whole stack.
-      // BackdropFilter's child is transparent → no black offscreen buffer.
-      child: ClipRRect(
-        borderRadius: navBr,
-        child: Stack(
-          children: [
-            // ── [0] BLUR LAYER — child MUST be transparent ──
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-              // DO NOT put any color here. Colors.transparent or SizedBox only.
-              child: const SizedBox.expand(),
+      child: Container(
+        height: _navBarHeight,
+        margin: const EdgeInsets.symmetric(horizontal: _navBarHorizontalMargin),
+        decoration: BoxDecoration(
+          borderRadius: navBr,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 40 : 15),
+              blurRadius: 25,
+              offset: const Offset(0, 12),
             ),
-
-            // ── [1] TINT LAYER — separate from blur, sits above ──
-            Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withOpacity(0.09)   // dark: subtle white veil
-                    : Colors.white.withOpacity(0.52),  // light: frosted milk glass
-              ),
-            ),
-
-            // ── [2] Border ring (drawn via DecoratedBox, not on Container above) ──
-            // Keeping border separate ensures it renders on top of the tint.
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: navBr,
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.18)
-                      : Colors.white.withOpacity(0.75),
-                  width: 0.8,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: navBr,
+          child: Stack(
+            children: [
+              // ── [0] BLUR LAYER ──
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                child: Container(
+                  color: isDark 
+                      ? Colors.white.withAlpha(15) 
+                      : Colors.white.withAlpha(120),
                 ),
               ),
-              child: const SizedBox.expand(),
-            ),
 
-            // ── [3] Vertical gradient sheen (top bright → bottom dim) ──
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withOpacity(isDark ? 0.06 : 0.20),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.6],
-                ),
-              ),
-            ),
-
-            // ── [4] 1px specular rim at the very top ──
-            Positioned(
-              top: 0,
-              left: 20,
-              right: 20,
-              height: 1.0,
-              child: DecoratedBox(
+              // ── [1] Specular Rim & Border ──
+              DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Colors.white.withOpacity(isDark ? 0.5 : 1.0),
-                      Colors.transparent,
-                    ],
+                  borderRadius: navBr,
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withAlpha(30)
+                        : Colors.white.withAlpha(100),
+                    width: 0.8,
                   ),
                 ),
+                child: const SizedBox.expand(),
               ),
-            ),
 
-            // ── [5] LIQUID PILL ──
-            AnimatedBuilder(
-              animation: _pillController,
-              builder: (context, _) {
-                final double visualPos = _isDragging
-                    ? (_selectedIndex + _dragOffsetFraction)
-                    : _pillPosition.value;
-                final double pillLeft =
-                    (visualPos * itemWidth) + (itemWidth / 2) - (_pillWidth / 2);
+              // ── [2] LIQUID PILL ──
+              AnimatedBuilder(
+                animation: _pillController,
+                builder: (context, _) {
+                  final double visualPos = _isDragging
+                      ? (_selectedIndex + _dragOffsetFraction)
+                      : _pillPosition.value;
+                  final double pillLeft =
+                      (visualPos * itemWidth) + (itemWidth / 2) - (_pillWidth / 2);
 
-                return Positioned(
-                  left: pillLeft.clamp(0.0, barWidth - _pillWidth),
-                  top: (_navBarHeight - _pillHeight) / 2,
-                  child: _LiquidPill(
-                    width: _pillWidth,
-                    height: _pillHeight,
-                    color: AppColors.primary,
-                    isDark: isDark,
-                  ),
-                );
-              },
-            ),
+                  return Positioned(
+                    left: pillLeft.clamp(0.0, barWidth - _pillWidth),
+                    top: (_navBarHeight - _pillHeight) / 2,
+                    child: _LiquidPill(
+                      width: _pillWidth,
+                      height: _pillHeight,
+                      color: AppColors.primary,
+                      isDark: isDark,
+                    ),
+                  );
+                },
+              ),
 
-            // ── [6] ICONS ──
-            Row(
-              children: List.generate(_navItems.length, (index) {
-                final item = _navItems[index];
-                final bool isSelected = _selectedIndex == index;
+              // ── [3] ICONS ──
+              Row(
+                children: List.generate(_navItems.length, (index) {
+                  final item = _navItems[index];
+                  final bool isSelected = _selectedIndex == index;
 
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => _onItemTapped(index),
-                    behavior: HitTestBehavior.opaque,
-                    child: SizedBox(
-                      height: _navBarHeight,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AnimatedScale(
-                            duration: const Duration(milliseconds: 280),
-                            curve: Curves.easeOutBack,
-                            scale: isSelected ? 1.1 : 1.0,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 180),
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => _onItemTapped(index),
+                      behavior: HitTestBehavior.opaque,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AnimatedScale(
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeOutBack,
+                              scale: isSelected ? 1.1 : 1.0,
                               child: Icon(
                                 isSelected ? item.activeIcon : item.icon,
-                                key: ValueKey('${index}_$isSelected'),
                                 color: isSelected
                                     ? AppColors.primary
                                     : (isDark
-                                        ? Colors.white.withOpacity(0.55)
-                                        : Colors.black.withOpacity(0.42)),
+                                        ? Colors.white.withAlpha(140)
+                                        : Colors.black.withAlpha(110)),
                                 size: 24,
                               ),
                             ),
-                          ),
-                          if (isSelected) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              item.label,
-                              style: GoogleFonts.poppins(
-                                color: AppColors.primary,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.2,
+                            if (isSelected) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                item.label,
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.primary,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          ] else
-                            const SizedBox(height: 11),
-                        ],
+                            ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }),
-            ),
-          ],
+                  );
+                }),
+              ),
+            ],
+          ),
         ),
       ),
     );

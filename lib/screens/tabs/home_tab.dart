@@ -94,37 +94,25 @@ class _HomeTabState extends State<HomeTab> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadAllData,
-          color: AppColors.primary,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(scale, isDark),
-                _buildSearchBar(scale, isDark),
-                if (_banners.isNotEmpty) _buildBannerCarousel(scale, contentWidth),
-                _buildSectionHeader('Categories', scale, isDark),
-                if (_categories.isNotEmpty) _buildCategories(scale, isDark),
-                _buildSectionHeader('Popular Pizzas', scale, isDark),
-                if (_popularPizzas.isNotEmpty) _buildVerticalPizzaList(scale, isDark),
-                _buildSectionHeader('Why Choose Us?', scale, isDark),
-                _buildWhyUs(scale, isDark),
-                SizedBox(height: 90 * scale),
-              ],
-            ),
-          ),
+    return RefreshIndicator(
+      onRefresh: _loadAllData,
+      color: AppColors.primary,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(scale, isDark),
+            _buildSearchBar(scale, isDark),
+            if (_banners.isNotEmpty) _buildBannerCarousel(scale, contentWidth),
+            _buildSectionHeader('Categories', scale, isDark),
+            if (_categories.isNotEmpty) _buildCategories(scale, isDark),
+            _buildSectionHeader('Popular Pizzas', scale, isDark),
+            if (_popularPizzas.isNotEmpty) _buildVerticalPizzaList(scale, isDark),
+            _buildSectionHeader('Why Choose Us?', scale, isDark),
+            _buildWhyUs(scale, isDark),
+            SizedBox(height: 120 * scale), // Space for floating nav bar
+          ],
         ),
       ),
     );

@@ -16,70 +16,65 @@ class _CartTabState extends State<CartTab> {
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final double scale = (sw.clamp(0.0, 430.0) / 375).clamp(0.85, 1.1);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: ValueListenableBuilder<List<CartItem>>(
-          valueListenable: CartService.cartItemsNotifier,
-          builder: (context, cartItems, child) {
-            if (cartItems.isEmpty) {
-              return _buildEmptyCart(scale, isDark);
-            }
-            return Column(
-              children: [
-                // Header
-                Padding(
-                  padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 12 * scale),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Your Cart',
-                        style: GoogleFonts.poppins(
-                          fontSize: 24 * scale,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF2D1A0E),
-                        ),
-                      ),
-                      SizedBox(width: 8 * scale),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 3 * scale),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${cartItems.length} items',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11 * scale,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
+    return ValueListenableBuilder<List<CartItem>>(
+      valueListenable: CartService.cartItemsNotifier,
+      builder: (context, cartItems, child) {
+        if (cartItems.isEmpty) {
+          return _buildEmptyCart(scale, isDark);
+        }
+        return Column(
+          children: [
+            // Header
+            Padding(
+              padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 12 * scale),
+              child: Row(
+                children: [
+                  Text(
+                    'Your Cart',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF2D1A0E),
+                    ),
                   ),
-                ),
-
-                // Items list
-                Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: cartItems.length,
-                    itemBuilder: (context, index) => _buildCartItem(cartItems[index], scale, isDark),
+                  SizedBox(width: 8 * scale),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 3 * scale),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${cartItems.length} items',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11 * scale,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
 
-                // Checkout bar
-                _buildCheckoutBar(scale, isDark),
-              ],
-            );
-          },
-        ),
-      ),
+            // Items list
+            Expanded(
+              child: ListView.builder(
+                padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+                physics: const BouncingScrollPhysics(),
+                itemCount: cartItems.length,
+                itemBuilder: (context, index) => _buildCartItem(cartItems[index], scale, isDark),
+              ),
+            ),
+
+            // Checkout bar
+            _buildCheckoutBar(scale, isDark),
+            SizedBox(height: 100 * scale), // Space for nav bar
+          ],
+        );
+      },
     );
   }
 

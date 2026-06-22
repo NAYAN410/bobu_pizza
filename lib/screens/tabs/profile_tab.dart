@@ -49,6 +49,10 @@ class _ProfileTabState extends State<ProfileTab> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    if (_isLoadingProfile) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
     final user = Supabase.instance.client.auth.currentUser;
     final String email = user?.email ?? 'guest@bobupizza.com';
     final String name = _profileData?['full_name'] ?? user?.userMetadata?['full_name'] ??
@@ -57,120 +61,113 @@ class _ProfileTabState extends State<ProfileTab> {
         ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
         : 'BP';
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: _isLoadingProfile 
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-              // Header card
-              _buildProfileHeader(name, email, initials, scale),
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        children: [
+          // Header card
+          _buildProfileHeader(name, email, initials, scale),
 
-              SizedBox(height: 24 * scale),
+          SizedBox(height: 24 * scale),
 
-              // Stats row
-              _buildStatsRow(scale, theme, isDark),
+          // Stats row
+          _buildStatsRow(scale, theme, isDark),
 
-              SizedBox(height: 24 * scale),
+          SizedBox(height: 24 * scale),
 
-              // Menu sections
-              _buildSection(
-                'Account',
-                [
-                  _MenuItem(Icons.person_outline_rounded,    'Edit Profile',        false),
-                  _MenuItem(Icons.location_on_outlined,      'Saved Addresses',     false),
-                  _MenuItem(Icons.payment_outlined,          'Payment Methods',     false),
-                ],
-                scale,
-                context,
-                theme,
-                isDark,
-              ),
-
-              SizedBox(height: 16 * scale),
-
-              _buildSection(
-                'Preferences',
-                [
-                  _MenuItem(Icons.notifications_none_rounded, 'Notifications',     false),
-                  _MenuItem(Icons.language_rounded,            'Language',          false),
-                  _MenuItem(Icons.dark_mode_outlined,          'Dark Mode',         true),
-                ],
-                scale,
-                context,
-                theme,
-                isDark,
-              ),
-
-              SizedBox(height: 16 * scale),
-
-              _buildSection(
-                'Support',
-                [
-                  _MenuItem(Icons.help_outline_rounded,        'Help & FAQ',        false),
-                  _MenuItem(Icons.privacy_tip_outlined,        'Privacy Policy',    false),
-                  _MenuItem(Icons.star_outline_rounded,        'Rate the App',      false),
-                ],
-                scale,
-                context,
-                theme,
-                isDark,
-              ),
-
-              SizedBox(height: 16 * scale),
-
-              // Sign out
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-                child: GestureDetector(
-                  onTap: () => _signOut(context),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 15 * scale),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                          color: Colors.red.withOpacity(0.25), width: 1),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.logout_rounded,
-                            color: Colors.red[400], size: 20 * scale),
-                        SizedBox(width: 8 * scale),
-                        Text(
-                          'Sign Out',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14 * scale,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.red[400],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              SizedBox(height: 16 * scale),
-
-              // App version
-              Text(
-                'Bobu Pizza v1.0.0',
-                style: GoogleFonts.poppins(
-                  fontSize: 11 * scale,
-                  color: isDark ? Colors.white30 : const Color(0xFF2D1A0E).withOpacity(0.3),
-                ),
-              ),
-
-              SizedBox(height: 100 * scale),
+          // Menu sections
+          _buildSection(
+            'Account',
+            [
+              _MenuItem(Icons.person_outline_rounded,    'Edit Profile',        false),
+              _MenuItem(Icons.location_on_outlined,      'Saved Addresses',     false),
+              _MenuItem(Icons.payment_outlined,          'Payment Methods',     false),
             ],
+            scale,
+            context,
+            theme,
+            isDark,
           ),
-        ),
+
+          SizedBox(height: 16 * scale),
+
+          _buildSection(
+            'Preferences',
+            [
+              _MenuItem(Icons.notifications_none_rounded, 'Notifications',     false),
+              _MenuItem(Icons.language_rounded,            'Language',          false),
+              _MenuItem(Icons.dark_mode_outlined,          'Dark Mode',         true),
+            ],
+            scale,
+            context,
+            theme,
+            isDark,
+          ),
+
+          SizedBox(height: 16 * scale),
+
+          _buildSection(
+            'Support',
+            [
+              _MenuItem(Icons.help_outline_rounded,        'Help & FAQ',        false),
+              _MenuItem(Icons.privacy_tip_outlined,        'Privacy Policy',    false),
+              _MenuItem(Icons.star_outline_rounded,        'Rate the App',      false),
+            ],
+            scale,
+            context,
+            theme,
+            isDark,
+          ),
+
+          SizedBox(height: 16 * scale),
+
+          // Sign out
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+            child: GestureDetector(
+              onTap: () => _signOut(context),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 15 * scale),
+                decoration: BoxDecoration(
+                  color: Colors.red.withAlpha(18),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: Colors.red.withAlpha(64), width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.logout_rounded,
+                        color: Colors.red[400], size: 20 * scale),
+                    SizedBox(width: 8 * scale),
+                    Text(
+                      'Sign Out',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14 * scale,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red[400],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          SizedBox(height: 16 * scale),
+
+          // App version
+          Text(
+            'Bobu Pizza v1.0.0',
+            style: GoogleFonts.poppins(
+              fontSize: 11 * scale,
+              color: isDark ? Colors.white30 : const Color(0xFF2D1A0E).withAlpha(76),
+            ),
+          ),
+
+          SizedBox(height: 120 * scale), // Space for floating nav bar
+        ],
       ),
     );
   }
