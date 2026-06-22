@@ -10,38 +10,6 @@ import 'tabs/cart_tab.dart';
 import 'tabs/orders_tab.dart';
 import 'tabs/profile_tab.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// iOS 26 LIQUID GLASS NAVBAR — Final correct approach
-//
-// WHY PREVIOUS APPROACHES FAILED:
-//   1. ClipRRect + BackdropFilter = black card
-//      Flutter renders an offscreen layer for clipping; BackdropFilter
-//      then blurs THAT (black) layer instead of what's behind it.
-//
-//   2. BackdropFilter without ClipRRect = entire screen blurs
-//      BackdropFilter with no clip boundary blurs everything behind it
-//      in the entire render tree above it.
-//
-// THE ACTUAL CORRECT FIX:
-//   Use a CustomClipper that Flutter can resolve BEFORE the offscreen
-//   layer is created. Specifically, wrap BackdropFilter in a widget that
-//   clips via `clipBehavior` on a *decorated* Container — this keeps the
-//   clipping information in the same render pass so Flutter doesn't need
-//   a separate black offscreen buffer.
-//
-//   Concretely: Put ClipRRect INSIDE BackdropFilter's subtree boundary,
-//   not wrapping it. The key is:
-//     ClipRRect (clips the visual output)
-//       └─ Stack
-//            ├─ BackdropFilter → SizedBox.expand() [TRANSPARENT child only]
-//            ├─ tint Container (no blur, just color + border)
-//            └─ icons etc.
-//
-//   The SizedBox.expand() child of BackdropFilter must be 100% transparent.
-//   Any color goes on a SEPARATE sibling layer above it.
-//   This is the pattern that actually works on both iOS and Android.
-// ─────────────────────────────────────────────────────────────────────────────
-
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -54,8 +22,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   static const double _navBarHeight = 68.0;
   static const double _navBarHorizontalMargin = 20.0;
-  static const double _navBarBottomMargin = 12.0; // Lowered from 28.0 for better bottom positioning
-  static const double _pillWidth = 72.0; // Slightly wider pill for better look
+  static const double _navBarBottomMargin = 12.0;
   static const double _pillHeight = 46.0;
 
   late AnimationController _pillController;
@@ -227,38 +194,20 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // BUILD
-  //
-  // Scaffold structure:
-  //   - extendBody: true  → tab content goes under the navbar area
-  //   - body: normal IndexedStack (tabs fill full screen)
-  //   - bottomNavigationBar: SizedBox with height only (reserves space)
-  //
-  // The glass navbar is in a Stack inside bottomNavigationBar.
-  // Because extendBody:true, the content scrolls BEHIND it → blur works.
-  //
-  // Black card fix: ClipRRect wraps the Stack, NOT the BackdropFilter.
-  // BackdropFilter's direct child is always Colors.transparent SizedBox.
-  // Tint is a separate Container sibling ABOVE the BackdropFilter.
-  // ═══════════════════════════════════════════════════════════════════════════
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final mq = MediaQuery.of(context);
     final double sw = mq.size.width;
     final double barWidth = sw - (_navBarHorizontalMargin * 2);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Content Layer — tabs fill full screen, but respect top safe area
           Positioned.fill(
             child: SafeArea(
-              bottom: false, // Allow content to flow behind navbar at bottom
+              bottom: false,
               child: IndexedStack(
                 index: _selectedIndex,
                 children: const [
@@ -271,8 +220,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
-
-          // Floating UI Layer
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
@@ -293,10 +240,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LIQUID GLASS NAVBAR WIDGET
-  // ═══════════════════════════════════════════════════════════════════════════
-
   Widget _buildLiquidGlassNavBar(bool isDark, double barWidth) {
     final double itemWidth = barWidth / _navItems.length;
     const double radius = 44.0;
@@ -311,11 +254,12 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         margin: const EdgeInsets.symmetric(horizontal: _navBarHorizontalMargin),
         decoration: BoxDecoration(
           borderRadius: navBr,
+          // Outer shadow gives floating feel without any card look
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 40 : 15),
-              blurRadius: 25,
-              offset: const Offset(0, 12),
+              color: Colors.black.withAlpha(isDark ? 50 : 20),
+              blurRadius: 30,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -323,69 +267,61 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           borderRadius: navBr,
           child: Stack(
             children: [
-            // ── [0] BLUR LAYER ──
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 25, sigmaY: 20), // Optimized blur
-              child: Container(
-                color: isDark 
-                    ? Colors.white.withAlpha(8)  // Extremely low opacity for dark mode
-                    : Colors.white.withAlpha(45), // Crystal clear milk glass for light mode
+              // ── [0] BLUR ONLY — child is 100% transparent ──
+              // This is the only correct way. Any color here = opaque glass.
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+                child: const SizedBox.expand(), // ← TRANSPARENT, NO COLOR
               ),
-            ),
 
-            // ── [1] Specular Rim & Border ──
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: navBr,
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withAlpha(15) // Thinner, subtle border
-                      : Colors.white.withAlpha(80),
-                  width: 0.6,
-                ),
+              // ── [1] TINT — separate layer, ultra low opacity ──
+              // Light mode: just a whisper of white so icons are readable
+              // Dark mode: even less — almost nothing
+              Container(
+                color: isDark
+                    ? Colors.white.withAlpha(12)  // ~5%
+                    : Colors.white.withAlpha(20), // ~8% — crystal clear
               ),
-              child: const SizedBox.expand(),
-            ),
 
-            // ── [2] LIQUID PILL ──
-            AnimatedBuilder(
-              animation: _pillController,
-              builder: (context, _) {
-                final double visualPos = _isDragging
-                    ? (_selectedIndex + _dragOffsetFraction)
-                    : _pillPosition.value;
-                final double pillWidth = itemWidth; // Width matches tab slot
-                final double pillLeft = visualPos * itemWidth;
-
-                return Positioned(
-                  left: pillLeft.clamp(0.0, barWidth - pillWidth),
-                  top: (_navBarHeight - _pillHeight) / 2,
-                  child: _LiquidPill(
-                    width: pillWidth,
-                    height: _pillHeight,
-                    color: AppColors.primary,
-                    isDark: isDark,
+              // ── [2] Border only ──
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: navBr,
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withAlpha(30)
+                        : Colors.white.withAlpha(90),
+                    width: 0.8,
                   ),
-                );
-              },
-            ),
-
-            // ── [3] Vertical gradient sheen ──
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withAlpha(isDark ? 10 : 30),
-                    Colors.transparent,
-                  ],
                 ),
+                child: const SizedBox.expand(),
               ),
-            ),
-            // ── [4] ICONS ──
-            Row(
-              children: List.generate(_navItems.length, (index) {
+
+              // ── [3] Liquid pill ──
+              AnimatedBuilder(
+                animation: _pillController,
+                builder: (context, _) {
+                  final double visualPos = _isDragging
+                      ? (_selectedIndex + _dragOffsetFraction)
+                      : _pillPosition.value;
+                  final double pillLeft = visualPos * itemWidth;
+
+                  return Positioned(
+                    left: pillLeft.clamp(0.0, barWidth - itemWidth),
+                    top: (_navBarHeight - _pillHeight) / 2,
+                    child: _LiquidPill(
+                      width: itemWidth,
+                      height: _pillHeight,
+                      color: AppColors.primary,
+                      isDark: isDark,
+                    ),
+                  );
+                },
+              ),
+
+              // ── [4] Icons ──
+              Row(
+                children: List.generate(_navItems.length, (index) {
                   final item = _navItems[index];
                   final bool isSelected = _selectedIndex == index;
 
@@ -408,7 +344,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                     : (isDark
                                         ? Colors.white.withAlpha(140)
                                         : Colors.black.withAlpha(110)),
-                                size: 28, // Increased from 24
+                                size: 26,
                               ),
                             ),
                             if (isSelected) ...[
@@ -435,10 +371,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       ),
     );
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MINI CART BAR
-  // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildMiniCartBar() {
     return ValueListenableBuilder(
@@ -509,11 +441,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LIQUID PILL
-// Same pattern: ClipRRect wraps Stack, BackdropFilter child is transparent.
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _LiquidPill extends StatelessWidget {
   final double width;
   final double height;
@@ -540,11 +467,11 @@ class _LiquidPill extends StatelessWidget {
           children: [
             // Blur — transparent child
             BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: const SizedBox.expand(),
             ),
 
-            // Brand tint
+            // Brand tint — low opacity so pill is glassy not filled
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -552,12 +479,12 @@ class _LiquidPill extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: isDark
                       ? [
-                          color.withAlpha(70),
-                          color.withAlpha(35),
+                          color.withAlpha(60),
+                          color.withAlpha(30),
                         ]
                       : [
-                          color.withAlpha(55),
-                          color.withAlpha(25),
+                          color.withAlpha(45),
+                          color.withAlpha(20),
                         ],
                 ),
               ),
@@ -568,32 +495,25 @@ class _LiquidPill extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: br,
                 border: Border.all(
-                  color: color.withAlpha(isDark ? 100 : 75),
+                  color: color.withAlpha(isDark ? 90 : 65),
                   width: 0.8,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withAlpha(55),
-                    blurRadius: 12,
-                    spreadRadius: 0,
-                  ),
-                ],
               ),
               child: const SizedBox.expand(),
             ),
 
-            // Specular streak
+            // Top specular streak
             Positioned(
               top: 2,
-              left: width * 0.22,
-              right: width * 0.22,
+              left: width * 0.25,
+              right: width * 0.25,
               height: 1.0,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
                       Colors.transparent,
-                      Colors.white.withAlpha(isDark ? 153 : 230),
+                      Colors.white.withAlpha(isDark ? 140 : 210),
                       Colors.transparent,
                     ],
                   ),
@@ -606,10 +526,6 @@ class _LiquidPill extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NAV ITEM MODEL
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _NavItem {
   final IconData icon;
