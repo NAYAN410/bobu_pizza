@@ -245,26 +245,30 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final mq = MediaQuery.of(context);
     final double sw = mq.size.width;
     final double barWidth = sw - (_navBarHorizontalMargin * 2);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Content Layer — tabs fill full screen
+          // Content Layer — tabs fill full screen, but respect top safe area
           Positioned.fill(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: const [
-                HomeTab(),
-                MenuTab(),
-                CartTab(),
-                OrdersTab(),
-                ProfileTab(),
-              ],
+            child: SafeArea(
+              bottom: false, // Allow content to flow behind navbar at bottom
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: const [
+                  HomeTab(),
+                  MenuTab(),
+                  CartTab(),
+                  OrdersTab(),
+                  ProfileTab(),
+                ],
+              ),
             ),
           ),
 
@@ -589,7 +593,7 @@ class _LiquidPill extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: [
                       Colors.transparent,
-                      Colors.white.withOpacity(isDark ? 0.6 : 0.9),
+                      Colors.white.withAlpha(isDark ? 153 : 230),
                       Colors.transparent,
                     ],
                   ),

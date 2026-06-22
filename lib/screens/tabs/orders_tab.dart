@@ -128,7 +128,7 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
       onRefresh: _fetchOrders,
       color: AppColors.primary,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120), // Added bottom padding for navbar
         itemCount: filteredOrders.length,
         itemBuilder: (context, index) {
           final order = filteredOrders[index];
