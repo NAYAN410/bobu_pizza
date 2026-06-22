@@ -80,6 +80,16 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(data);
   }
 
+  static Future<List<Map<String, dynamic>>> searchPizzas(String query) async {
+    await checkConnectivity();
+    final data = await client
+        .from('pizzas')
+        .select()
+        .ilike('name', '%$query%')
+        .limit(5);
+    return List<Map<String, dynamic>>.from(data);
+  }
+
   // Order Methods
   static Future<Map<String, dynamic>> placeOrder({
     required String address,
