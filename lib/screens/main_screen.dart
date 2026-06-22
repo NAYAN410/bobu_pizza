@@ -354,14 +354,14 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 final double visualPos = _isDragging
                     ? (_selectedIndex + _dragOffsetFraction)
                     : _pillPosition.value;
-                final double pillLeft =
-                    (visualPos * itemWidth) + (itemWidth / 2) - (_pillWidth / 2);
+                final double pillWidth = itemWidth; // Width matches tab slot
+                final double pillLeft = visualPos * itemWidth;
 
                 return Positioned(
-                  left: pillLeft.clamp(0.0, barWidth - _pillWidth),
+                  left: pillLeft.clamp(0.0, barWidth - pillWidth),
                   top: (_navBarHeight - _pillHeight) / 2,
                   child: _LiquidPill(
-                    width: _pillWidth,
+                    width: pillWidth,
                     height: _pillHeight,
                     color: AppColors.primary,
                     isDark: isDark,
@@ -408,7 +408,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                     : (isDark
                                         ? Colors.white.withAlpha(140)
                                         : Colors.black.withAlpha(110)),
-                                size: 24,
+                                size: 28, // Increased from 24
                               ),
                             ),
                             if (isSelected) ...[
