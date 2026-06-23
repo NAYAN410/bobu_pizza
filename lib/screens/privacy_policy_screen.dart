@@ -65,7 +65,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24 * scale),
             ...sections.map((section) => Padding(
-              padding: EdgeInsets.bottom(24 * scale),
+              padding: EdgeInsets.only(bottom: 24 * scale),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
