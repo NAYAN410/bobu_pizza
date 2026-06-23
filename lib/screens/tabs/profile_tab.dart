@@ -42,6 +42,64 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  void _showRatingDialog(BuildContext context, double scale, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Rate Our App',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF2D1A0E),
+          ),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.star_rounded, color: Colors.amber, size: 60 * scale),
+            SizedBox(height: 16 * scale),
+            Text(
+              'Enjoying Bobu Pizza? Please take a moment to rate us on the Play Store!',
+              style: GoogleFonts.poppins(
+                fontSize: 13 * scale,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Later',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Thank you for your rating!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              'Rate Now',
+              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
@@ -68,12 +126,7 @@ class _ProfileTabState extends State<ProfileTab> {
           // Header card
           _buildProfileHeader(name, email, initials, scale),
 
-          SizedBox(height: 24 * scale),
-
-          // Stats row
-          _buildStatsRow(scale, theme, isDark),
-
-          SizedBox(height: 24 * scale),
+          SizedBox(height: 16 * scale),
 
           // Menu sections
           _buildSection(
@@ -81,7 +134,6 @@ class _ProfileTabState extends State<ProfileTab> {
             [
               _MenuItem(Icons.person_outline_rounded,    'Edit Profile',        false),
               _MenuItem(Icons.location_on_outlined,      'Saved Addresses',     false),
-              _MenuItem(Icons.payment_outlined,          'Payment Methods',     false),
             ],
             scale,
             context,
@@ -268,61 +320,6 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildStatsRow(double scale, ThemeData theme, bool isDark) {
-    final stats = [
-      {'label': 'Orders',    'value': '12'},
-      {'label': 'Favourites','value': '5'},
-      {'label': 'Reviews',   'value': '3'},
-    ];
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-      child: Row(
-        children: stats.map((s) {
-          return Expanded(
-            child: Container(
-              margin: EdgeInsets.only(
-                  right: s != stats.last ? 10 * scale : 0),
-              padding: EdgeInsets.symmetric(vertical: 14 * scale),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border:
-                Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
-                boxShadow: isDark ? [] : [
-                  BoxShadow(
-                    color: const Color(0xFF2D1A0E).withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    s['value']!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 20 * scale,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  SizedBox(height: 2 * scale),
-                  Text(
-                    s['label']!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11 * scale,
-                      color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
   Widget _buildSection(String title, List<_MenuItem> items,
       double scale, BuildContext context, ThemeData theme, bool isDark) {
     return Padding(
@@ -370,6 +367,12 @@ class _ProfileTabState extends State<ProfileTab> {
                           if (result == true) {
                             _fetchProfile();
                           }
+                        } else if (item.label == 'Help & FAQ') {
+                          Navigator.pushNamed(context, '/help-faq');
+                        } else if (item.label == 'Privacy Policy') {
+                          Navigator.pushNamed(context, '/privacy-policy');
+                        } else if (item.label == 'Rate the App') {
+                          _showRatingDialog(context, scale, isDark);
                         }
                       },
                       behavior: HitTestBehavior.opaque,

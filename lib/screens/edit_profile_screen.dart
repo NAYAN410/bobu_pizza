@@ -13,6 +13,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -24,10 +25,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _loadProfile() async {
     final profile = await SupabaseService.getProfile();
+    final userEmail = SupabaseService.client.auth.currentUser?.email;
     if (profile != null && mounted) {
       setState(() {
         _nameController.text = profile['full_name'] ?? '';
         _phoneController.text = profile['phone'] ?? '';
+        _emailController.text = userEmail ?? '';
         _isLoading = false;
       });
     }
@@ -93,6 +96,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   _buildTextField(_nameController, 'Full Name', Icons.person_outline, isDark),
                   const SizedBox(height: 16),
+                  _buildTextField(_emailController, 'Email Address (Non-editable)', Icons.email_outlined, isDark, readOnly: true),
+                  const SizedBox(height: 16),
                   _buildTextField(_phoneController, 'Phone Number', Icons.phone_outlined, isDark, keyboardType: TextInputType.phone),
                   const SizedBox(height: 40),
                   SizedBox(
@@ -122,7 +127,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, bool isDark, {int maxLines = 1, TextInputType? keyboardType}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, bool isDark, {int maxLines = 1, TextInputType? keyboardType, bool readOnly = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -137,12 +142,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          readOnly: readOnly,
           style: GoogleFonts.poppins(
             fontSize: 15,
-            color: isDark ? Colors.white : Colors.black,
+            color: readOnly 
+                ? (isDark ? Colors.white38 : Colors.grey[600])
+                : (isDark ? Colors.white : Colors.black),
           ),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
+            prefixIcon: Icon(icon, color: readOnly ? Colors.grey : AppColors.primary, size: 22),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12), 
               borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade300)
@@ -153,10 +161,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12), 
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5)
+              borderSide: BorderSide(color: readOnly ? (isDark ? Colors.white10 : Colors.grey.shade300) : AppColors.primary, width: 1.5)
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+            fillColor: readOnly 
+                ? (isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade100)
+                : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50),
             hintStyle: GoogleFonts.poppins(color: isDark ? Colors.white24 : Colors.grey),
           ),
         ),

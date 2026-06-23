@@ -9,6 +9,8 @@ import 'screens/checkout_screen.dart';
 import 'screens/error_screen.dart';
 import 'screens/address_screen.dart';
 import 'screens/edit_profile_screen.dart';
+import 'screens/help_faq_screen.dart';
+import 'screens/privacy_policy_screen.dart';
 import 'services/theme_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -66,6 +68,8 @@ class MyApp extends StatelessWidget {
             '/error': (context) => const ErrorScreen(),
             '/addresses': (context) => const AddressScreen(),
             '/edit-profile': (context) => const EditProfileScreen(),
+            '/help-faq': (context) => const HelpFaqScreen(),
+            '/privacy-policy': (context) => const PrivacyPolicyScreen(),
           },
         );
       },
