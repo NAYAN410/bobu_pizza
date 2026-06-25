@@ -28,7 +28,6 @@ Future<void> main() async {
 
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await NotificationService.initialize();
 
   await dotenv.load(fileName: ".env");
 
@@ -36,6 +35,8 @@ Future<void> main() async {
     url: dotenv.env['SUPABASE_URL'] ?? '',
     anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
   );
+
+  await NotificationService.initialize();
 
   final themeService = ThemeService();
   await themeService.init();

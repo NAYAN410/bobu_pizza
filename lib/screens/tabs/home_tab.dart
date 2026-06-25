@@ -274,20 +274,23 @@ class _HomeTabState extends State<HomeTab> {
                       itemCount: _searchResults.length,
                       itemBuilder: (context, index) {
                         final pizza = _searchResults[index];
-                        return ListTile(
-                          onTap: () {
-                            _searchController.clear();
-                            _onSearchChanged('');
-                            _showPizzaDetails(context, pizza, scale, isDark);
-                          },
-                          leading: Container(
-                            width: 50, height: 50,
-                            decoration: BoxDecoration(color: AppColors.primary.withAlpha(20), borderRadius: BorderRadius.circular(10)),
-                            child: Image.network(pizza.imageUrl, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png')),
+                        return Material(
+                          color: Colors.transparent,
+                          child: ListTile(
+                            onTap: () {
+                              _searchController.clear();
+                              _onSearchChanged('');
+                              _showPizzaDetails(context, pizza, scale, isDark);
+                            },
+                            leading: Container(
+                              width: 50, height: 50,
+                              decoration: BoxDecoration(color: AppColors.primary.withAlpha(20), borderRadius: BorderRadius.circular(10)),
+                              child: Image.network(pizza.imageUrl, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png')),
+                            ),
+                            title: Text(pizza.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                            subtitle: Text('₹${pizza.discountedPrice.toInt()}', style: GoogleFonts.poppins(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                           ),
-                          title: Text(pizza.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                          subtitle: Text('₹${pizza.discountedPrice.toInt()}', style: GoogleFonts.poppins(color: AppColors.primary, fontWeight: FontWeight.w600)),
-                          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                         );
                       },
                     ),

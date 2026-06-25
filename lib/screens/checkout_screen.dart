@@ -278,31 +278,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[100]),
                 itemBuilder: (context, index) {
                   final item = cartItems[index];
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: Container(
-                      width: 50 * scale,
-                      height: 50 * scale,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFFFF0DC), 
-                        borderRadius: BorderRadius.circular(10)
+                  return Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: Container(
+                        width: 50 * scale,
+                        height: 50 * scale,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFFFF0DC), 
+                          borderRadius: BorderRadius.circular(10)
+                        ),
+                        child: Image.network(item.pizza.imageUrl, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png')),
                       ),
-                      child: Image.network(item.pizza.imageUrl, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png')),
+                      title: Text(item.pizza.name, 
+                        style: GoogleFonts.poppins(
+                          fontSize: 14 * scale, 
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black,
+                        )),
+                      subtitle: Text('Qty: ${item.quantity}', 
+                        style: GoogleFonts.poppins(fontSize: 12 * scale, color: Colors.grey)),
+                      trailing: Text('₹${item.totalPrice.toInt()}', 
+                        style: GoogleFonts.poppins(
+                          fontSize: 14 * scale, 
+                          fontWeight: FontWeight.bold, 
+                          color: AppColors.primary
+                        )),
                     ),
-                    title: Text(item.pizza.name, 
-                      style: GoogleFonts.poppins(
-                        fontSize: 14 * scale, 
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : Colors.black,
-                      )),
-                    subtitle: Text('Qty: ${item.quantity}', 
-                      style: GoogleFonts.poppins(fontSize: 12 * scale, color: Colors.grey)),
-                    trailing: Text('₹${item.totalPrice.toInt()}', 
-                      style: GoogleFonts.poppins(
-                        fontSize: 14 * scale, 
-                        fontWeight: FontWeight.bold, 
-                        color: AppColors.primary
-                      )),
                   );
                 },
               ),
@@ -496,34 +499,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             itemBuilder: (context, index) {
               final address = _addresses[index];
               final isSelected = _selectedAddress?.id == address.id;
-              return ListTile(
-                onTap: () => setState(() => _selectedAddress = address),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                leading: Icon(
-                  isSelected ? Icons.check_circle : Icons.circle_outlined,
-                  color: isSelected ? AppColors.primary : (isDark ? Colors.white24 : Colors.grey),
-                ),
-                title: Text(address.title, 
-                  style: GoogleFonts.poppins(
-                    fontSize: 14 * scale, 
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black,
-                  )),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(address.fullAddress, 
-                      style: GoogleFonts.poppins(
-                        fontSize: 12 * scale, 
-                        color: isDark ? Colors.white60 : Colors.grey[600]
-                      )),
-                    Text('Ph: ${address.phoneNumber}', 
-                      style: GoogleFonts.poppins(
-                        fontSize: 11 * scale, 
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? Colors.white38 : Colors.grey[800]
-                      )),
-                  ],
+              return Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  onTap: () => setState(() => _selectedAddress = address),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: Icon(
+                    isSelected ? Icons.check_circle : Icons.circle_outlined,
+                    color: isSelected ? AppColors.primary : (isDark ? Colors.white24 : Colors.grey),
+                  ),
+                  title: Text(address.title, 
+                    style: GoogleFonts.poppins(
+                      fontSize: 14 * scale, 
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    )),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(address.fullAddress, 
+                        style: GoogleFonts.poppins(
+                          fontSize: 12 * scale, 
+                          color: isDark ? Colors.white60 : Colors.grey[600]
+                        )),
+                      Text('Ph: ${address.phoneNumber}', 
+                        style: GoogleFonts.poppins(
+                          fontSize: 11 * scale, 
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white38 : Colors.grey[800]
+                        )),
+                    ],
+                  ),
                 ),
               );
             },
