@@ -37,7 +37,12 @@ Future<void> main() async {
       anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
     );
 
-    await NotificationService.initialize();
+    // Try to initialize notifications but don't crash if it fails (common on sideloaded iOS)
+    try {
+      await NotificationService.initialize();
+    } catch (e) {
+      debugPrint('Notification Initialization Error: $e');
+    }
 
     final themeService = ThemeService();
     await themeService.init();

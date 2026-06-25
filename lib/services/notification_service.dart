@@ -60,6 +60,14 @@ class NotificationService {
         sound: true,
       );
 
+      // On iOS, APNS token can take a moment to arrive
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken == null) {
+          await Future.delayed(const Duration(seconds: 3));
+        }
+      }
+
       // Save token to Supabase
       String? token = await _messaging.getToken();
       if (token != null) {
