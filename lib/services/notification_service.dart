@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 class NotificationService {
@@ -34,7 +35,7 @@ class NotificationService {
           AndroidInitializationSettings('@mipmap/ic_launcher');
       
       const InitializationSettings initializationSettings = InitializationSettings(
-        android: androidDetails, // Error here, should be local setting
+        android: initializationSettingsAndroid,
         iOS: DarwinInitializationSettings(),
       );
       
@@ -135,7 +136,7 @@ class NotificationService {
     );
   }
 
-  static Future<void> getToken() async {
+  static Future<String?> getToken() async {
     return await _messaging.getToken();
   }
 
