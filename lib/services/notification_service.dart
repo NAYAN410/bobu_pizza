@@ -62,17 +62,16 @@ class NotificationService {
 
       // On iOS, APNS token can take a moment to arrive
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-        String? apnsToken = await _messaging.getAPNSToken();
-        if (apnsToken == null) {
-          await Future.delayed(const Duration(seconds: 3));
+        // Try multiple times to get APNS token
+        for (int i = 0; i < 5; i++) {
+          String? apnsToken = await _messaging.getAPNSToken();
+          if (apnsToken != null) break;
+          await Future.delayed(const Duration(seconds: 2));
         }
       }
 
       // Save token to Supabase
-      String? token = await _messaging.getToken();
-      if (token != null) {
-        await SupabaseService.updateFcmToken(token);
-      }
+      await updateTokenToServer();
 
       // Handle token refresh
       _messaging.onTokenRefresh.listen((newToken) {
@@ -146,6 +145,18 @@ class NotificationService {
 
   static Future<String?> getToken() async {
     return await _messaging.getToken();
+  }
+
+  static Future<void> updateTokenToServer() async {
+    try {
+      String? token = await _messaging.getToken();
+      if (token != null) {
+        await SupabaseService.updateFcmToken(token);
+        if (kDebugMode) print('FCM Token updated successfully: $token');
+      }
+    } catch (e) {
+      if (kDebugMode) print('Error updating FCM token to server: $e');
+    }
   }
 
   static void listenToOrderStatus() {

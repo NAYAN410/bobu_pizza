@@ -283,7 +283,11 @@ class SupabaseService {
   static Future<void> updateFcmToken(String token) async {
     final user = client.auth.currentUser;
     if (user != null) {
-      await client.from('profiles').update({'fcm_token': token}).eq('id', user.id);
+      try {
+        await client.from('profiles').update({'fcm_token': token}).eq('id', user.id);
+      } catch (e) {
+        debugPrint('Error in updateFcmToken: $e');
+      }
     }
   }
 }

@@ -100,6 +100,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       // Sync cart immediately after login
       await CartService.fetchCartFromDb();
+      await NotificationService.updateTokenToServer();
       NotificationService.listenToOrderStatus();
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } on AuthException catch (e) {
@@ -116,11 +117,10 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       final isIOS = !kIsWeb && Platform.isIOS;
 
-      // Android requires no clientId (uses google-services.json)
-      // iOS requires the specific Client ID to start the sign-in flow
       final googleSignIn = GoogleSignIn(
         clientId: isIOS ? dotenv.env['GOOGLE_IOS_CLIENT_ID'] : null,
         serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
+        scopes: ['email', 'profile'],
       );
       
       await googleSignIn.signOut();
@@ -148,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen>
       await SupabaseService.getProfile();
 
       await CartService.fetchCartFromDb();
+      await NotificationService.updateTokenToServer();
       NotificationService.listenToOrderStatus();
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
