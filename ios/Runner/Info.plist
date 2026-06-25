@@ -41,16 +41,15 @@
 
 	<!-- GOOGLE SIGN IN FIX -->
 	<key>GIDClientID</key>
-	<string>474443519088-3druogolel6953mb25gkgcb4p3o2jnlo.apps.googleusercontent.com</string>
+	<string>92717029-rvb2t4fqdhlc6nl1g0hni2a5m6dvtj0d.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
-
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.474443519088-3druogolel6953mb25gkgcb4p3o2jnlo</string>
+				<string>com.googleusercontent.apps.92717029-rvb2t4fqdhlc6nl1g0hni2a5m6dvtj0d</string>
 			</array>
 		</dict>
 	</array>
@@ -83,6 +82,11 @@
 
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

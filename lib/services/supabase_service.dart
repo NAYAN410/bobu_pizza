@@ -279,4 +279,11 @@ class SupabaseService {
       'updated_at': DateTime.now().toIso8601String(),
     });
   }
+
+  static Future<void> updateFcmToken(String token) async {
+    final user = client.auth.currentUser;
+    if (user != null) {
+      await client.from('profiles').update({'fcm_token': token}).eq('id', user.id);
+    }
+  }
 }

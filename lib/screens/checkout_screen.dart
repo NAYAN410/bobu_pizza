@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
 import '../models/address_model.dart';
+import '../services/notification_service.dart';
 import 'order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -165,6 +166,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (mounted) {
         await CartService.clearCart(); 
         setState(() => _isPlacingOrder = false);
+        
+        // Show local notification
+        NotificationService.showNotification(
+          title: 'Order Placed! 🍕',
+          body: 'Your order #${result['id']} has been placed successfully.',
+        );
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => OrderSuccessScreen(orderData: result))
         );
