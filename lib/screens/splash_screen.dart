@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 import '../services/supabase_service.dart';
 import '../services/cart_service.dart';
+import '../services/notification_service.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'main_screen.dart';
@@ -140,6 +141,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (user != null) {
           // Sync cart from DB on app start
           await CartService.fetchCartFromDb();
+          NotificationService.listenToOrderStatus();
           nextScreen = const MainScreen();
         } else if (isFirstTime) {
           nextScreen = const OnboardingScreen();

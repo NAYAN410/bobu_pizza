@@ -9,6 +9,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/constants.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -99,6 +100,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       // Sync cart immediately after login
       await CartService.fetchCartFromDb();
+      NotificationService.listenToOrderStatus();
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } on AuthException catch (e) {
       _showSnack(e.message, Colors.red);
@@ -146,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen>
       await SupabaseService.getProfile();
 
       await CartService.fetchCartFromDb();
+      NotificationService.listenToOrderStatus();
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');

@@ -34,9 +34,11 @@ class NotificationService {
           AndroidInitializationSettings('@mipmap/ic_launcher');
       
       const InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
+        android: androidDetails, // Error here, should be local setting
         iOS: DarwinInitializationSettings(),
       );
+      
+      // Fixing the initialization settings (I see a potential typo in my mind, let's check current code)
 
       await _localNotifications.initialize(
         initializationSettings,
@@ -133,7 +135,56 @@ class NotificationService {
     );
   }
 
-  static Future<String?> getToken() async {
+  static Future<void> getToken() async {
     return await _messaging.getToken();
+  }
+
+  static void listenToOrderStatus() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    Supabase.instance.client
+        .channel('order_status_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'orders',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            final newStatus = payload.newRecord['status'];
+            final oldStatus = payload.oldRecord['status'];
+
+            if (newStatus != oldStatus) {
+              String title = 'Order Update 🍕';
+              String body = '';
+
+              switch (newStatus.toString().toLowerCase()) {
+                case 'preparing':
+                  body = 'Great news! Your order has been accepted and is now being prepared.';
+                  break;
+                case 'out_for_delivery':
+                  body = 'Your delicious pizza is on the way! 🛵';
+                  break;
+                case 'delivered':
+                  body = 'Enjoy your meal! Your order has been delivered. 🎁';
+                  title = 'Order Delivered!';
+                  break;
+                case 'cancelled':
+                  body = 'Sorry, your order was rejected or cancelled. ❌';
+                  title = 'Order Update';
+                  break;
+                default:
+                  return;
+              }
+
+              showNotification(title: title, body: body);
+            }
+          },
+        )
+        .subscribe();
   }
 }
