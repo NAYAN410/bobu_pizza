@@ -16,6 +16,9 @@ jobs:
           channel: stable
           architecture: x64
 
+      - name: Create SourcePackages Directory
+        run: mkdir -p build/ios/SourcePackages
+
       - name: Flutter Pub Get
         run: flutter pub get
 
