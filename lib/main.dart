@@ -24,42 +24,29 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  await dotenv.load(fileName: ".env");
+
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL'] ?? '',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+  );
+
+  // Try to initialize notifications but don't crash if it fails (common on sideloaded iOS)
   try {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-    await dotenv.load(fileName: ".env");
-
-    await Supabase.initialize(
-      url: dotenv.env['SUPABASE_URL'] ?? '',
-      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-    );
-
-    // Try to initialize notifications but don't crash if it fails (common on sideloaded iOS)
-    try {
-      await NotificationService.initialize();
-    } catch (e) {
-      debugPrint('Notification Initialization Error: $e');
-    }
-
-    final themeService = ThemeService();
-    await themeService.init();
-
-    runApp(const MyApp());
+    await NotificationService.initialize();
   } catch (e) {
-    runApp(MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Text('Initialization Error: $e', style: const TextStyle(color: Colors.red)),
-          ),
-        ),
-      ),
-    ));
+    debugPrint('Notification Initialization Error: $e');
   }
+
+  final themeService = ThemeService();
+  await themeService.init();
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {

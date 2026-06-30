@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'supabase_service.dart';
 
 class NotificationService {
@@ -18,103 +19,107 @@ class NotificationService {
   );
 
   static Future<void> initialize() async {
-    // Request permission for iOS/Android 13+
-    NotificationSettings settings = await _messaging.requestPermission(
+    final prefs = await SharedPreferences.getInstance();
+    final bool hasRequestedPermission = prefs.getBool('notification_requested') ?? false;
+
+    if (!hasRequestedPermission) {
+      // Request permission for iOS/Android 13+
+      NotificationSettings settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      
+      if (kDebugMode) {
+        print('User permission status: ${settings.authorizationStatus}');
+      }
+      
+      // Save that we have requested once
+      await prefs.setBool('notification_requested', true);
+    }
+
+    // Initialize local notifications regardless of permission (to setup the plugin)
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: DarwinInitializationSettings(),
+    );
+
+    await _localNotifications.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (details) {
+        // Handle notification tap
+      },
+    );
+
+    // Create Android Notification Channel
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_channel);
+
+    // Set foreground notification options for Firebase
+    await _messaging.setForegroundNotificationPresentationOptions(
       alert: true,
       badge: true,
       sound: true,
     );
 
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      if (kDebugMode) {
-        print('User granted permission');
+    // On iOS, APNS token can take a moment to arrive
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      // Try multiple times to get APNS token
+      for (int i = 0; i < 5; i++) {
+        String? apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken != null) break;
+        await Future.delayed(const Duration(seconds: 2));
       }
-
-      // Initialize local notifications
-      const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-      
-      const InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: DarwinInitializationSettings(),
-      );
-      
-      // Fixing the initialization settings (I see a potential typo in my mind, let's check current code)
-
-      await _localNotifications.initialize(
-        initializationSettings,
-        onDidReceiveNotificationResponse: (details) {
-          // Handle notification tap
-        },
-      );
-
-      // Create Android Notification Channel
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(_channel);
-
-      // Set foreground notification options for Firebase
-      await _messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-
-      // On iOS, APNS token can take a moment to arrive
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-        // Try multiple times to get APNS token
-        for (int i = 0; i < 5; i++) {
-          String? apnsToken = await _messaging.getAPNSToken();
-          if (apnsToken != null) break;
-          await Future.delayed(const Duration(seconds: 2));
-        }
-      }
-
-      // Save token to Supabase
-      await updateTokenToServer();
-
-      // Handle token refresh
-      _messaging.onTokenRefresh.listen((newToken) {
-        SupabaseService.updateFcmToken(newToken);
-      });
-
-      // Handle foreground messages
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        RemoteNotification? notification = message.notification;
-        AndroidNotification? android = message.notification?.android;
-
-        if (notification != null && android != null && !kIsWeb) {
-          _localNotifications.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                _channel.id,
-                _channel.name,
-                channelDescription: _channel.description,
-                icon: android.smallIcon ?? '@mipmap/ic_launcher',
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-              ),
-              iOS: const DarwinNotificationDetails(
-                presentAlert: true,
-                presentBadge: true,
-                presentSound: true,
-              ),
-            ),
-          );
-        }
-      });
-
-      // Handle message when app is opened from notification
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        if (kDebugMode) {
-          print('App opened from notification: ${message.messageId}');
-        }
-      });
     }
+
+    // Save token to Supabase
+    await updateTokenToServer();
+
+    // Handle token refresh
+    _messaging.onTokenRefresh.listen((newToken) {
+      SupabaseService.updateFcmToken(newToken);
+    });
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+
+      if (notification != null && android != null && !kIsWeb) {
+        _localNotifications.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channel.id,
+              _channel.name,
+              channelDescription: _channel.description,
+              icon: android.smallIcon ?? '@mipmap/ic_launcher',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+            ),
+            iOS: const DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
+          ),
+        );
+      }
+    });
+
+    // Handle message when app is opened from notification
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      if (kDebugMode) {
+        print('App opened from notification: ${message.messageId}');
+      }
+    });
   }
 
   static Future<void> showNotification({required String title, required String body}) async {

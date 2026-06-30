@@ -405,17 +405,17 @@ class _LoginScreenState extends State<LoginScreen>
               Container(
                   width: 30 * scale,
                   height: 1.2,
-                  color: AppColors.pizzaGreen.withOpacity(isDark ? 0.3 : 0.5)),
+                  color: AppColors.pizzaGreen.withAlpha(isDark ? 76 : 128)),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6 * scale),
                 child: Icon(Icons.local_pizza_outlined,
                     size: 13 * scale,
-                    color: AppColors.pizzaGreen.withOpacity(isDark ? 0.5 : 0.7)),
+                    color: AppColors.pizzaGreen.withAlpha(isDark ? 128 : 178)),
               ),
               Container(
                   width: 30 * scale,
                   height: 1.2,
-                  color: AppColors.pizzaGreen.withOpacity(isDark ? 0.3 : 0.5)),
+                  color: AppColors.pizzaGreen.withAlpha(isDark ? 76 : 128)),
             ],
           ),
         ),
@@ -437,12 +437,12 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildOtpField(double scale, bool isDark) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.75),
+        color: isDark ? Colors.white.withAlpha(13) : Colors.white.withAlpha(191),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
         boxShadow: isDark ? [] : [
           BoxShadow(
-            color: const Color(0xFFD4956A).withOpacity(0.08),
+            color: const Color(0xFFD4956A).withAlpha(20),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -462,12 +462,12 @@ class _LoginScreenState extends State<LoginScreen>
         decoration: InputDecoration(
           hintText: '• • • • • •',
           hintStyle: GoogleFonts.poppins(
-            color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.25),
+            color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withAlpha(64),
             fontSize: 18 * scale,
             letterSpacing: 8,
           ),
           prefixIcon: Icon(Icons.pin_outlined,
-              color: AppColors.primary.withOpacity(0.7), size: 20 * scale),
+              color: AppColors.primary.withAlpha(178), size: 20 * scale),
           border: InputBorder.none,
           counterText: '',
           contentPadding:
@@ -491,14 +491,14 @@ class _LoginScreenState extends State<LoginScreen>
     return Container(
       decoration: BoxDecoration(
         color: enabled
-            ? (isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.75))
-            : (isDark ? Colors.black26 : Colors.grey.withOpacity(0.08)),
+            ? (isDark ? Colors.white.withAlpha(13) : Colors.white.withAlpha(191))
+            : (isDark ? Colors.black26 : Colors.grey.withAlpha(20)),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
         boxShadow: [
           if (enabled && !isDark)
             BoxShadow(
-              color: const Color(0xFFD4956A).withOpacity(0.08),
+              color: const Color(0xFFD4956A).withAlpha(20),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -515,11 +515,11 @@ class _LoginScreenState extends State<LoginScreen>
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: GoogleFonts.poppins(
-            color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.35),
+            color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withAlpha(89),
             fontSize: 14 * scale,
           ),
           prefixIcon: Icon(prefixIcon,
-              color: AppColors.primary.withOpacity(0.7), size: 20 * scale),
+              color: AppColors.primary.withAlpha(178), size: 20 * scale),
           border: InputBorder.none,
           contentPadding:
           EdgeInsets.symmetric(horizontal: 20, vertical: 16 * scale),
@@ -545,7 +545,7 @@ class _LoginScreenState extends State<LoginScreen>
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 6,
-          shadowColor: AppColors.primary.withOpacity(0.35),
+          shadowColor: AppColors.primary.withAlpha(89),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
         ),
@@ -575,13 +575,13 @@ class _LoginScreenState extends State<LoginScreen>
       children: [
         Expanded(
             child: Divider(
-                color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.15))),
+                color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withAlpha(38))),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12 * scale),
           child: Text(
             'OR',
             style: GoogleFonts.poppins(
-              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.35),
+              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withAlpha(89),
               fontSize: 11 * scale,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.5,
@@ -590,7 +590,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         Expanded(
             child: Divider(
-                color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withOpacity(0.15))),
+                color: isDark ? Colors.white10 : const Color(0xFF2D1A0E).withAlpha(38))),
       ],
     );
   }
@@ -604,12 +604,12 @@ class _LoginScreenState extends State<LoginScreen>
         width: double.infinity,
         padding: EdgeInsets.symmetric(vertical: 14 * scale),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+          color: isDark ? Colors.white.withAlpha(13) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
           boxShadow: isDark ? [] : [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withAlpha(15),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

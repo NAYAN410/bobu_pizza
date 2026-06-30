@@ -165,6 +165,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (mounted) {
         await CartService.clearCart(); 
+        if (!mounted) return;
         setState(() => _isPlacingOrder = false);
         
         // Show local notification
@@ -173,6 +174,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           body: 'Your order #${result['id']} has been placed successfully.',
         );
 
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => OrderSuccessScreen(orderData: result))
         );
@@ -185,50 +187,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       }
     }
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle_outline, color: Colors.green, size: 80),
-            const SizedBox(height: 16),
-            Text('Order Placed!', 
-              style: GoogleFonts.poppins(
-                fontSize: 20, 
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-              )),
-            const SizedBox(height: 8),
-            Text('Your delicious pizza is on its way.', 
-              textAlign: TextAlign.center, 
-              style: GoogleFonts.poppins(color: Colors.grey)),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); 
-                  Navigator.of(context).pushReplacementNamed('/home'); 
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Back to Home', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -275,7 +233,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: cartItems.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[100]),
+                separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[100]),
                 itemBuilder: (context, index) {
                   final item = cartItems[index];
                   return Material(
@@ -286,10 +244,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         width: 50 * scale,
                         height: 50 * scale,
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFFFF0DC), 
+                          color: isDark ? Colors.white.withAlpha(13) : const Color(0xFFFFF0DC), 
                           borderRadius: BorderRadius.circular(10)
                         ),
-                        child: Image.network(item.pizza.imageUrl, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png')),
+                        child: Image.network(item.pizza.imageUrl, errorBuilder: (context, error, stackTrace) => Image.asset('assets/images/pizza.png')),
                       ),
                       title: Text(item.pizza.name, 
                         style: GoogleFonts.poppins(
@@ -495,7 +453,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _addresses.length,
-            separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[100]),
+            separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey[100]),
             itemBuilder: (context, index) {
               final address = _addresses[index];
               final isSelected = _selectedAddress?.id == address.id;
@@ -582,7 +540,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         hintText: hintText,
         hintStyle: GoogleFonts.poppins(color: isDark ? Colors.white24 : Colors.grey[400], fontSize: 14 * scale),
         filled: true,
-        fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        fillColor: isDark ? Colors.white.withAlpha(13) : Colors.white,
         contentPadding: const EdgeInsets.all(16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -612,7 +570,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected 
-            ? AppColors.primary.withOpacity(0.1) 
+            ? AppColors.primary.withAlpha(26)
             : (isDark ? theme.cardColor : Colors.white),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
