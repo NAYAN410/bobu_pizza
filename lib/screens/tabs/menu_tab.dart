@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants.dart';
 import '../../services/supabase_service.dart';
@@ -17,248 +19,537 @@ class _MenuTabState extends State<MenuTab> {
   int _selectedCategoryIndex = 0;
   List<CategoryModel> _categories = [];
   List<Pizza> _allItems = [];
-  bool _isLoading = true;
+
+  final Map<int, List<Pizza>> _cache = {};
+  final Map<int, bool> _cacheHasMore = {};
+
+  bool _isInitialLoading = true;
+  bool _isCategoryLoading = false;
   bool _isMoreLoading = false;
   bool _hasMore = true;
-  final int _pageSize = 4;
+
+  final int _pageSize = 10;
   final ScrollController _scrollController = ScrollController();
+
+  // ── Sidebar wheel controller ──
+  late final FixedExtentScrollController _wheelController =
+  FixedExtentScrollController(initialItem: _selectedCategoryIndex);
+
+  // True while a tap-triggered animateToItem is running.
+  // Prevents intermediate pass-through items from firing loads/haptics.
+  bool _isProgrammaticScroll = false;
+
+  // ── Fixed sizes (no longer scaled) so the sidebar looks identical everywhere ──
+  static const double _sidebarWidth = 84.0;
+  static const double _itemHeight = 76.0;
 
   @override
   void initState() {
     super.initState();
-    _loadMenuData();
+    _initialFetch();
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _wheelController.dispose();
     super.dispose();
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (!_isMoreLoading && _hasMore) {
-        _loadMoreItems();
+  Future<void> _initialFetch() async {
+    try {
+      final categoryData = await SupabaseService.getCategories();
+      if (mounted) {
+        setState(() {
+          final List<CategoryModel> dbCategories =
+          categoryData.map((e) => CategoryModel.fromJson(e)).toList();
+          _categories = [
+            CategoryModel(id: -1, name: 'All', icon: '🍽️'),
+            ...dbCategories,
+          ];
+          _isInitialLoading = false;
+        });
+        _loadCategoryItems(0);
       }
+    } catch (e) {
+      debugPrint('Error: $e');
+      if (mounted) setState(() => _isInitialLoading = false);
     }
   }
 
-  Future<void> _loadMenuData() async {
+  Future<void> _loadCategoryItems(int index) async {
+    if (_cache.containsKey(index)) {
+      setState(() {
+        _allItems = _cache[index]!;
+        _hasMore = _cacheHasMore[index] ?? true;
+        _isCategoryLoading = false;
+      });
+      return;
+    }
+
     setState(() {
-      _isLoading = true;
+      _isCategoryLoading = true;
       _allItems = [];
-      _hasMore = true;
     });
+
     try {
-      final results = await Future.wait([
-        SupabaseService.getCategories(),
-        SupabaseService.getPizzas(
-          category: _selectedCategoryIndex == 0 ? null : _categories[_selectedCategoryIndex].name,
-          from: 0,
-          to: _pageSize - 1,
-        ),
-      ]);
+      final data = await SupabaseService.getPizzas(
+        category: index == 0 ? null : _categories[index].name,
+        from: 0,
+        to: _pageSize - 1,
+      );
+
+      final items = data.map((e) => Pizza.fromJson(e)).toList();
 
       if (mounted) {
         setState(() {
-          if (_categories.isEmpty) {
-            _categories = [
-              CategoryModel(id: -1, name: 'All', icon: '🍽️'),
-              ...(results[0] as List).map((e) => CategoryModel.fromJson(e)),
-            ];
-          }
-          _allItems = (results[1] as List).map((e) => Pizza.fromJson(e)).toList();
-          _hasMore = _allItems.length == _pageSize;
-          _isLoading = false;
+          _allItems = items;
+          _cache[index] = items;
+          _hasMore = items.length == _pageSize;
+          _cacheHasMore[index] = _hasMore;
+          _isCategoryLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error loading menu data: $e');
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Error: $e');
+      if (mounted) setState(() => _isCategoryLoading = false);
     }
   }
 
   Future<void> _loadMoreItems() async {
+    if (_isMoreLoading || !_hasMore) return;
+
     setState(() => _isMoreLoading = true);
+    final currentIndex = _selectedCategoryIndex;
+
     try {
       final nextItemsData = await SupabaseService.getPizzas(
-        category: _selectedCategoryIndex == 0 ? null : _categories[_selectedCategoryIndex].name,
+        category: currentIndex == 0 ? null : _categories[currentIndex].name,
         from: _allItems.length,
         to: _allItems.length + _pageSize - 1,
       );
 
       final nextItems = nextItemsData.map((e) => Pizza.fromJson(e)).toList();
 
-      if (mounted) {
+      if (mounted && _selectedCategoryIndex == currentIndex) {
         setState(() {
           _allItems.addAll(nextItems);
+          _cache[currentIndex] = List.from(_allItems);
           _hasMore = nextItems.length == _pageSize;
+          _cacheHasMore[currentIndex] = _hasMore;
           _isMoreLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error loading more items: $e');
+      debugPrint('Error: $e');
       if (mounted) setState(() => _isMoreLoading = false);
     }
   }
 
-  // Helper to handle category change
-  void _onCategoryTapped(int index) {
-    if (_selectedCategoryIndex == index) return;
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreItems();
+    }
+  }
+
+  /// Called when the user TAPS a category (may be far away, e.g. 1 → 4).
+  /// Animates the wheel smoothly through all intermediate items without
+  /// triggering loads/haptics for each one it passes.
+  Future<void> _onCategoryTapped(int index) async {
+    if (index < 0 || index >= _categories.length) return;
+    if (index == _selectedCategoryIndex) return;
+
+    final int distance = (index - _selectedCategoryIndex).abs();
+    // Slightly longer duration for longer jumps so it still feels natural,
+    // capped so it never feels sluggish.
+    final int durationMs = (320 + distance * 55).clamp(320, 700);
+
+    HapticFeedback.selectionClick();
+    setState(() => _isProgrammaticScroll = true);
+
+    await _wheelController.animateToItem(
+      index,
+      duration: Duration(milliseconds: durationMs),
+      curve: Curves.easeOutCubic,
+    );
+
+    if (!mounted) return;
     setState(() {
       _selectedCategoryIndex = index;
+      _isProgrammaticScroll = false;
     });
-    _loadMenuData();
+    _loadCategoryItems(index);
+  }
+
+  /// Called when the user physically DRAGS the wheel and it settles on
+  /// a new item. Ignored while a tap-triggered animation is in progress.
+  void _onWheelSelectedItemChanged(int index) {
+    if (_isProgrammaticScroll) return;
+    if (index == _selectedCategoryIndex) return;
+    HapticFeedback.selectionClick();
+    setState(() => _selectedCategoryIndex = index);
+    _loadCategoryItems(index);
   }
 
   @override
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
-    final double contentWidth = sw.clamp(0.0, 500.0);
-    final double scale = (contentWidth / 375).clamp(0.85, 1.1);
-    final double bottomPad = MediaQuery.of(context).padding.bottom + 100;
+    final double scale = (sw.clamp(0.0, 500.0) / 375).clamp(0.85, 1.1);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    if (_isLoading) {
+    if (_isInitialLoading) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Header ──
-        Padding(
-          padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 0),
-          child: Text(
-            'Our Menu',
-            style: GoogleFonts.poppins(
-              fontSize: 24 * scale,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF2D1A0E),
-            ),
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark ? AppColors.bgGradientDark : AppColors.bgGradient,
+          stops: const [0.0, 0.55, 1.0],
         ),
-        Padding(
-          padding: EdgeInsets.only(left: 20 * scale, right: 20 * scale, bottom: 14 * scale),
-          child: Text(
-            'Explore our wide range of pizzas, handcrafted with fresh dough, premium cheeses, and locally sourced toppings.',
-            style: GoogleFonts.poppins(
-              fontSize: 13 * scale,
-              color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.45),
-            ),
-          ),
-        ),
-
-        // ── Category chips ──
-        SizedBox(
-          height: 42 * scale,
-          child: ListView.builder(
-            padding: EdgeInsets.only(left: 20 * scale),
-            scrollDirection: Axis.horizontal,
-            itemCount: _categories.length,
-            itemBuilder: (context, index) {
-              final isActive = index == _selectedCategoryIndex;
-              return GestureDetector(
-                onTap: () => _onCategoryTapped(index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
-                  margin: EdgeInsets.only(right: 10 * scale),
-                  padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
-                  decoration: BoxDecoration(
-                    color: isActive ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isActive ? AppColors.primary : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
-                      width: 1.2,
-                    ),
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_categories[index].icon, style: TextStyle(fontSize: 14 * scale)),
-                      SizedBox(width: 6 * scale),
-                      Text(
-                        _categories[index].name,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12 * scale,
-                          fontWeight: FontWeight.w600,
-                          color: isActive ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF2D1A0E)),
-                        ),
-                      ),
-                    ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 12 * scale),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Our Menu',
+                  style: GoogleFonts.poppins(
+                    fontSize: 22 * scale,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                   ),
                 ),
-              );
-            },
-          ),
-        ),
-
-        SizedBox(height: 12 * scale),
-
-        // ── Item count ──
-        Padding(
-          padding: EdgeInsets.only(left: 20 * scale, bottom: 10 * scale),
-          child: Text(
-            '${_allItems.length} items',
-            style: GoogleFonts.poppins(
-              fontSize: 12 * scale,
-              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.4),
-              fontWeight: FontWeight.w500,
+                Icon(Icons.search_rounded, size: 24 * scale, color: isDark ? Colors.white70 : Colors.black87),
+              ],
             ),
           ),
-        ),
+          Expanded(
+            child: Row(
+              children: [
+                _buildSidebar(isDark),
+                Expanded(
+                  child: _isCategoryLoading
+                      ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                      : RefreshIndicator(
+                    onRefresh: () async {
+                      _cache.remove(_selectedCategoryIndex);
+                      await _loadCategoryItems(_selectedCategoryIndex);
+                    },
+                    color: AppColors.primary,
+                    child: _allItems.isEmpty
+                        ? _buildEmptyState(isDark)
+                        : ListView.builder(
+                      controller: _scrollController,
+                      padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 120 * scale),
+                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                      itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == _allItems.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                          );
+                        }
+                        final item = _allItems[index];
+                        return GestureDetector(
+                          onTap: () => _showPizzaDetails(context, item, scale, isDark),
+                          child: _buildCompactMenuCard(item, scale, isDark),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-        // ── List ──
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _loadMenuData,
-            color: AppColors.primary,
-            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: EdgeInsets.only(
-                left: 20 * scale,
-                right: 20 * scale,
-                bottom: bottomPad,
+  // ─────────────────────────────────────────────────────────
+  // Sidebar — fixed size, centered pill, ultra-smooth drag wheel
+  // ─────────────────────────────────────────────────────────
+  Widget _buildSidebar(bool isDark) {
+    return Container(
+      width: _sidebarWidth,
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: isDark ? Colors.white10 : Colors.black.withOpacity(0.05), width: 1),
+        ),
+      ),
+      child: ClipRRect(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  color: isDark ? Colors.white.withOpacity(0.03) : Colors.white.withOpacity(0.4),
+                ),
               ),
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
+            ),
+
+            // Fixed, perfectly centered highlight pill
+            Align(
+              alignment: Alignment.center,
+              child: Container(
+                width: _sidebarWidth - 16,
+                height: _itemHeight - 14,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primary.withOpacity(isDark ? 0.22 : 0.14),
+                      AppColors.primary.withOpacity(isDark ? 0.08 : 0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.35), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.18),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
               ),
-              itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _allItems.length) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24.0),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary.withOpacity(0.5),
+            ),
+
+            ListWheelScrollView.useDelegate(
+              controller: _wheelController,
+              itemExtent: _itemHeight,
+              diameterRatio: 2.0,
+              perspective: 0.0025,
+              physics: const FixedExtentScrollPhysics(),
+              overAndUnderCenterOpacity: 1.0,
+              onSelectedItemChanged: _onWheelSelectedItemChanged,
+              childDelegate: ListWheelChildBuilderDelegate(
+                childCount: _categories.length,
+                builder: (context, index) {
+                  return AnimatedBuilder(
+                    animation: _wheelController,
+                    builder: (context, child) {
+                      double diff;
+                      if (_wheelController.hasClients && _wheelController.position.hasContentDimensions) {
+                        diff = (index * _itemHeight - _wheelController.offset) / _itemHeight;
+                      } else {
+                        diff = (index - _selectedCategoryIndex).toDouble();
+                      }
+                      final double closeness = (1 - diff.abs()).clamp(0.0, 1.0);
+                      final double iconScale = 0.82 + 0.36 * closeness;
+                      final double opacity = (0.4 + 0.6 * closeness).clamp(0.0, 1.0);
+                      final bool isActive = index == _selectedCategoryIndex;
+
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _onCategoryTapped(index),
+                        child: Opacity(
+                          opacity: opacity,
+                          child: Transform.scale(
+                            scale: iconScale,
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _categories[index].icon,
+                                    style: const TextStyle(fontSize: 24),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _categories[index].name,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 10,
+                                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                                      color: isActive
+                                          ? AppColors.primary
+                                          : (isDark ? Colors.white54 : Colors.grey[600]),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('🍕', style: TextStyle(fontSize: 40)),
+          const SizedBox(height: 12),
+          Text('No items found', style: GoogleFonts.poppins(color: isDark ? Colors.white54 : Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactMenuCard(Pizza item, double scale, bool isDark) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 16 * scale),
+      padding: EdgeInsets.all(12 * scale),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!, width: 1),
+        boxShadow: isDark
+            ? []
+            : [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              Container(
+                width: 90 * scale,
+                height: 90 * scale,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Hero(
+                  tag: 'pizza_${item.id}',
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: item.imageUrl.startsWith('http')
+                        ? Image.network(item.imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png'))
+                        : Image.asset('assets/images/pizza.png', fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+              if (item.discount > 0)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF388E3C),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(14), bottomRight: Radius.circular(8)),
+                    ),
+                    child: Text('${item.discount}%', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(width: 12 * scale),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 10 * scale,
+                      height: 10 * scale,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: item.isVeg ? Colors.green : Colors.red, width: 1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 5 * scale,
+                          height: 5 * scale,
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: item.isVeg ? Colors.green : Colors.red),
+                        ),
                       ),
                     ),
-                  );
-                }
-                final item = _allItems[index];
-                return GestureDetector(
-                  onTap: () => _showPizzaDetails(context, item, scale, isDark),
-                  child: _buildMenuCard(item, scale, isDark),
-                );
-              },
+                    if (item.category == 'Bestseller') ...[
+                      SizedBox(width: 6 * scale),
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                      Text(' Bestseller', style: GoogleFonts.poppins(fontSize: 9, color: Colors.amber[800], fontWeight: FontWeight.bold)),
+                    ],
+                  ],
+                ),
+                SizedBox(height: 4 * scale),
+                Text(
+                  item.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14 * scale,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 2 * scale),
+                Text(
+                  item.description,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10 * scale,
+                    color: isDark ? Colors.white38 : Colors.grey[600],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 8 * scale),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (item.discount > 0)
+                          Text('₹${item.price.toInt()}', style: TextStyle(fontSize: 10, color: Colors.grey, decoration: TextDecoration.lineThrough)),
+                        Text('₹${item.discountedPrice.toInt()}', style: GoogleFonts.poppins(fontSize: 15 * scale, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                      ],
+                    ),
+                    SizedBox(
+                      height: 32 * scale,
+                      child: ElevatedButton(
+                        onPressed: () => CartService.addToCart(item),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: Text('ADD', style: GoogleFonts.poppins(fontSize: 11 * scale, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -284,7 +575,6 @@ class _MenuTabState extends State<MenuTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. Large Image Header
                         Container(
                           width: double.infinity,
                           height: 300 * scale,
@@ -302,7 +592,6 @@ class _MenuTabState extends State<MenuTab> {
                                       : Image.asset('assets/images/pizza.png', height: 220 * scale, fit: BoxFit.contain),
                                 ),
                               ),
-                              // Close Button
                               Positioned(
                                 top: 20 * scale,
                                 right: 20 * scale,
@@ -315,7 +604,6 @@ class _MenuTabState extends State<MenuTab> {
                                   ),
                                 ),
                               ),
-                              // Bestseller & Discount tags
                               if (item.category == 'Bestseller')
                                 Positioned(
                                   top: 20 * scale,
@@ -332,13 +620,11 @@ class _MenuTabState extends State<MenuTab> {
                             ],
                           ),
                         ),
-
                         Padding(
                           padding: EdgeInsets.all(24 * scale),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 2. Info Row (Veg icon + Name + Rating)
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -349,14 +635,16 @@ class _MenuTabState extends State<MenuTab> {
                                         Row(
                                           children: [
                                             Container(
-                                              width: 16 * scale, height: 16 * scale,
+                                              width: 16 * scale,
+                                              height: 16 * scale,
                                               decoration: BoxDecoration(
                                                 border: Border.all(color: item.isVeg ? Colors.green : Colors.red, width: 1),
                                                 borderRadius: BorderRadius.circular(3),
                                               ),
                                               child: Center(
                                                 child: Container(
-                                                  width: 8 * scale, height: 8 * scale,
+                                                  width: 8 * scale,
+                                                  height: 8 * scale,
                                                   decoration: BoxDecoration(shape: BoxShape.circle, color: item.isVeg ? Colors.green : Colors.red),
                                                 ),
                                               ),
@@ -383,17 +671,11 @@ class _MenuTabState extends State<MenuTab> {
                                   ),
                                 ],
                               ),
-                              
                               SizedBox(height: 16 * scale),
-                              
-                              // 3. Description
                               Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                               SizedBox(height: 8 * scale),
                               Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white60 : AppColors.textGrey, height: 1.5)),
-                              
                               SizedBox(height: 24 * scale),
-                              
-                              // 4. Customization Options (Placeholder)
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey[50], borderRadius: BorderRadius.circular(16)),
@@ -407,18 +689,17 @@ class _MenuTabState extends State<MenuTab> {
                                   ],
                                 ),
                               ),
-                              
-                              SizedBox(height: 100 * scale), // Space for bottom bar
+                              SizedBox(height: 100 * scale),
                             ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  
-                  // 5. Fixed Bottom Pricing Bar
                   Positioned(
-                    bottom: 0, left: 0, right: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
                     child: Container(
                       padding: EdgeInsets.all(24 * scale),
                       decoration: BoxDecoration(
@@ -427,7 +708,6 @@ class _MenuTabState extends State<MenuTab> {
                       ),
                       child: Row(
                         children: [
-                          // Price info
                           Expanded(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -439,7 +719,6 @@ class _MenuTabState extends State<MenuTab> {
                               ],
                             ),
                           ),
-                          // Quantity Counter
                           Container(
                             decoration: BoxDecoration(border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!), borderRadius: BorderRadius.circular(12)),
                             child: Row(
@@ -451,7 +730,6 @@ class _MenuTabState extends State<MenuTab> {
                             ),
                           ),
                           SizedBox(width: 16 * scale),
-                          // Add Button
                           ElevatedButton(
                             onPressed: () {
                               CartService.addToCart(item, quantity: quantity);
@@ -476,251 +754,4 @@ class _MenuTabState extends State<MenuTab> {
       },
     );
   }
-
-  Widget _buildMenuCard(Pizza item, double scale, bool isDark) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 24 * scale),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: const Color(0xFF2D1A0E).withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top: Image + Tags
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                child: Container(
-                  width: double.infinity,
-                  height: 180 * scale,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
-                  ),
-                  child: Hero(
-                    tag: 'pizza_${item.id}',
-                    child: item.imageUrl.startsWith('http')
-                        ? Image.network(
-                            item.imageUrl,
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover, // Poora fill karega
-                            errorBuilder: (context, error, stackTrace) => 
-                              Image.asset('assets/images/pizza.png', fit: BoxFit.cover),
-                          )
-                        : Image.asset(
-                            'assets/images/pizza.png',
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                  ),
-                ),
-              ),
-              // Discount Tag (Left)
-              if (item.discount > 0)
-                Positioned(
-                  top: 15 * scale,
-                  left: 0,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 6 * scale),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF388E3C),
-                      borderRadius: BorderRadius.only(
-                        topRight: Radius.circular(12),
-                        bottomRight: Radius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      '${item.discount}% OFF',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11 * scale,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              // Bestseller Tag (Right)
-              if (item.category == 'Bestseller')
-                Positioned(
-                  top: 15 * scale,
-                  right: 15 * scale,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 5 * scale),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.3),
-                          blurRadius: 8,
-                        )
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star_rounded, color: Colors.white, size: 12 * scale),
-                        SizedBox(width: 4 * scale),
-                        Text(
-                          'Bestseller',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10 * scale,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
-          // Bottom: Content
-          Padding(
-            padding: EdgeInsets.all(20 * scale),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 12 * scale,
-                                height: 12 * scale,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: item.isVeg ? Colors.green : Colors.red, width: 1),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                                child: Center(
-                                  child: Container(
-                                    width: 6 * scale,
-                                    height: 6 * scale,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: item.isVeg ? Colors.green : Colors.red,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 8 * scale),
-                              Expanded(
-                                child: Text(
-                                  item.name,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 18 * scale,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
-                        SizedBox(width: 4 * scale),
-                        Text(
-                          item.rating.toString(),
-                          style: GoogleFonts.poppins(
-                            fontSize: 14 * scale,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white70 : const Color(0xFF2D1A0E),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8 * scale),
-                Text(
-                  item.description,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13 * scale,
-                    color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withOpacity(0.5),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 20 * scale),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (item.discount > 0)
-                          Text(
-                            '₹${item.price.toInt()}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12 * scale,
-                              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.3),
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                        Text(
-                          '₹${item.discountedPrice.toInt()}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 22 * scale,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : const Color(0xFF2D1A0E),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                      height: 48 * scale,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          CartService.addToCart(item);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                          shadowColor: AppColors.primary.withOpacity(0.4),
-                          padding: EdgeInsets.symmetric(horizontal: 24 * scale),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          'Add to Cart',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14 * scale,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
-
