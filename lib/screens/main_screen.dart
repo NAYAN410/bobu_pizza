@@ -288,10 +288,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 decoration: BoxDecoration(
                   borderRadius: navBr,
                   border: Border.all(
-                    color: isDark
-                        ? Colors.white.withAlpha(30)
-                        : Colors.white.withAlpha(90),
-                    width: 0.8,
+                    color: AppColors.primary.withAlpha(120), // Added red border
+                    width: 1.2,
                   ),
                 ),
                 child: const SizedBox.expand(),

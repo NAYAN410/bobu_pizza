@@ -39,9 +39,9 @@ class _MenuTabState extends State<MenuTab> {
   // Prevents intermediate pass-through items from firing loads/haptics.
   bool _isProgrammaticScroll = false;
 
-  // ── Fixed sizes (no longer scaled) so the sidebar looks identical everywhere ──
-  static const double _sidebarWidth = 84.0;
-  static const double _itemHeight = 76.0;
+  // ── Fixed sizes — sidebar looks identical everywhere ──
+  static const double _sidebarWidth = 92.0; // Increased width slightly
+  static const double _itemHeight = 82.0; // Increased height to fit 2 lines comfortably
 
   @override
   void initState() {
@@ -234,40 +234,53 @@ class _MenuTabState extends State<MenuTab> {
             ),
           ),
           Expanded(
-            child: Row(
+            child: Stack(
               children: [
-                _buildSidebar(isDark),
-                Expanded(
-                  child: _isCategoryLoading
-                      ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-                      : RefreshIndicator(
-                    onRefresh: () async {
-                      _cache.remove(_selectedCategoryIndex);
-                      await _loadCategoryItems(_selectedCategoryIndex);
-                    },
-                    color: AppColors.primary,
-                    child: _allItems.isEmpty
-                        ? _buildEmptyState(isDark)
-                        : ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 120 * scale),
-                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                      itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == _allItems.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
-                          );
-                        }
-                        final item = _allItems[index];
-                        return GestureDetector(
-                          onTap: () => _showPizzaDetails(context, item, scale, isDark),
-                          child: _buildCompactMenuCard(item, scale, isDark),
-                        );
-                      },
+                // ── Right Content ──
+                Row(
+                  children: [
+                    const SizedBox(width: _sidebarWidth + 24), // Offset for floating sidebar
+                    Expanded(
+                      child: _isCategoryLoading
+                          ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                          : RefreshIndicator(
+                        onRefresh: () async {
+                          _cache.remove(_selectedCategoryIndex);
+                          await _loadCategoryItems(_selectedCategoryIndex);
+                        },
+                        color: AppColors.primary,
+                        child: _allItems.isEmpty
+                            ? _buildEmptyState(isDark)
+                            : ListView.builder(
+                          controller: _scrollController,
+                          padding: EdgeInsets.fromLTRB(0, 12 * scale, 16 * scale, 140 * scale),
+                          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                          itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _allItems.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 20),
+                                child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                              );
+                            }
+                            final item = _allItems[index];
+                            return GestureDetector(
+                              onTap: () => _showPizzaDetails(context, item, scale, isDark),
+                              child: _buildCompactMenuCard(item, scale, isDark),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
+                ),
+
+                // ── Left Sidebar (Floating Capsule) ──
+                Positioned(
+                  top: 0,
+                  left: 12 * scale,
+                  bottom: 85 * scale, // Sits just above the main navbar
+                  child: _buildSidebar(isDark, scale),
                 ),
               ],
             ),
@@ -278,24 +291,30 @@ class _MenuTabState extends State<MenuTab> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // Sidebar — fixed size, centered pill, ultra-smooth drag wheel
+  // Sidebar — Floating Capsule, centered pill, ultra-smooth drag wheel
   // ─────────────────────────────────────────────────────────
-  Widget _buildSidebar(bool isDark) {
+  Widget _buildSidebar(bool isDark, double scale) {
+    final BorderRadius capsuleRadius = BorderRadius.circular(40 * scale);
+
     return Container(
       width: _sidebarWidth,
       decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(color: isDark ? Colors.white10 : Colors.black.withOpacity(0.05), width: 1),
+        borderRadius: capsuleRadius,
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.3), // Reddish border for capsule
+          width: 1.2,
         ),
       ),
       child: ClipRRect(
+        borderRadius: capsuleRadius,
         child: Stack(
           children: [
+            // Glass Background
             Positioned.fill(
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
-                  color: isDark ? Colors.white.withOpacity(0.03) : Colors.white.withOpacity(0.4),
+                  color: isDark ? Colors.white.withOpacity(0.04) : Colors.white.withOpacity(0.45),
                 ),
               ),
             ),
@@ -311,17 +330,16 @@ class _MenuTabState extends State<MenuTab> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      AppColors.primary.withOpacity(isDark ? 0.22 : 0.14),
-                      AppColors.primary.withOpacity(isDark ? 0.08 : 0.05),
+                      AppColors.primary.withOpacity(isDark ? 0.25 : 0.16),
+                      AppColors.primary.withOpacity(isDark ? 0.10 : 0.06),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.35), width: 1.2),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.2),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.18),
-                      blurRadius: 14,
-                      spreadRadius: 1,
+                      color: AppColors.primary.withOpacity(0.2),
+                      blurRadius: 15,
                     ),
                   ],
                 ),
@@ -368,18 +386,22 @@ class _MenuTabState extends State<MenuTab> {
                                     _categories[index].icon,
                                     style: const TextStyle(fontSize: 24),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _categories[index].name,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10,
-                                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                                      color: isActive
-                                          ? AppColors.primary
-                                          : (isDark ? Colors.white54 : Colors.grey[600]),
+                                  const SizedBox(height: 4),
+                                  SizedBox(
+                                    width: _sidebarWidth - 28, // Forces text to wrap before hitting red box edge
+                                    child: Text(
+                                      _categories[index].name,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      softWrap: true,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 9,
+                                        height: 1.0, // Tighter line height for 2-line text
+                                        fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                                        color: isActive
+                                            ? AppColors.primary
+                                            : (isDark ? Colors.white54 : Colors.grey[600]),
+                                      ),
                                     ),
                                   ),
                                 ],
