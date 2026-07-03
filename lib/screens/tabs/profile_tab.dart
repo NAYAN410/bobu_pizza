@@ -404,7 +404,21 @@ class _ProfileTabState extends State<ProfileTab> {
                                 ),
                               ),
                             ),
-                            if (item.hasToggle)
+                            if (item.label == 'Dark Mode')
+                              DropdownButton<AppThemeMode>(
+                                value: ThemeService().modeSetting,
+                                underline: const SizedBox(),
+                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary, size: 20 * scale),
+                                items: [
+                                  DropdownMenuItem(value: AppThemeMode.system, child: Text('System', style: GoogleFonts.poppins(fontSize: 12 * scale))),
+                                  DropdownMenuItem(value: AppThemeMode.light, child: Text('Light', style: GoogleFonts.poppins(fontSize: 12 * scale))),
+                                  DropdownMenuItem(value: AppThemeMode.dark, child: Text('Dark', style: GoogleFonts.poppins(fontSize: 12 * scale))),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) ThemeService().setThemeMode(val);
+                                },
+                              )
+                            else if (item.hasToggle)
                               Switch(
                                 value: ThemeService().isDarkMode,
                                 onChanged: (val) {

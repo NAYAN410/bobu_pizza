@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants.dart';
 import '../services/supabase_service.dart';
 import '../services/cart_service.dart';
 import '../services/notification_service.dart';
+import '../services/theme_service.dart';
+import 'package:safe_device/safe_device.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'main_screen.dart';
@@ -48,7 +54,9 @@ class _SplashScreenState extends State<SplashScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light, // White icons for dark splash
       systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
     ));
   }
 
@@ -101,11 +109,11 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
     )..repeat();
 
-    // Dot loader pulse
+    // Progress bar fill animation — will be manually controlled by initialization steps
     _dotController = AnimationController(
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
-    )..repeat(reverse: true);
+    );
   }
 
   Future<void> _runSequence() async {
@@ -122,16 +130,52 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _initializeApp() async {
-    await Future.delayed(const Duration(seconds: 5));
-    if (!mounted) return;
+    // We start animations immediately, and run init tasks in parallel
+    final stopwatch = Stopwatch()..start();
 
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 5));
-      if (result.isEmpty || result[0].rawAddress.isEmpty) {
+      // 1. Critical Parallel Initializations (Core services)
+      await Future.wait([
+        Firebase.initializeApp(),
+        dotenv.load(fileName: ".env"),
+        ThemeService().init(),
+      ]);
+      _dotController.animateTo(0.25, curve: Curves.easeInOut);
+
+      // 2. Supabase depends on dotenv
+      await Supabase.initialize(
+        url: dotenv.env['SUPABASE_URL'] ?? '',
+        anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+      );
+      _dotController.animateTo(0.45, curve: Curves.easeInOut);
+
+      // 3. Run non-blocking services & checks in parallel
+      final results = await Future.wait([
+        SafeDevice.isJailBroken,
+        SafeDevice.isRealDevice,
+        InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3)),
+        NotificationService.initialize(),
+      ]);
+      _dotController.animateTo(0.70, curve: Curves.easeInOut);
+
+      bool isJailbroken = results[0] as bool;
+      bool isRealDevice = results[1] as bool;
+      final internetResult = results[2] as List<InternetAddress>;
+
+      // Security Check
+      if (isJailbroken || (!isRealDevice && !kDebugMode)) {
+        if (mounted) {
+          _showSecurityAlert('Security Breach', 'This app cannot run on rooted devices or emulators.');
+        }
+        return;
+      }
+
+      // Connectivity Check
+      if (internetResult.isEmpty || internetResult[0].rawAddress.isEmpty) {
         throw Exception('No internet');
       }
 
+      // 4. Auth & Navigation logic
       Widget nextScreen;
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -139,7 +183,6 @@ class _SplashScreenState extends State<SplashScreen>
         final user = await SupabaseService.getCurrentUser();
 
         if (user != null) {
-          // Sync cart from DB on app start
           await CartService.fetchCartFromDb();
           NotificationService.listenToOrderStatus();
           nextScreen = const MainScreen();
@@ -151,22 +194,29 @@ class _SplashScreenState extends State<SplashScreen>
       } catch (e) {
         final prefs = await SharedPreferences.getInstance();
         final bool isFirstTime = prefs.getBool('is_first_time') ?? true;
-        nextScreen =
-        isFirstTime ? const OnboardingScreen() : const LoginScreen();
+        nextScreen = isFirstTime ? const OnboardingScreen() : const LoginScreen();
+      }
+
+      _dotController.animateTo(1.0, duration: const Duration(milliseconds: 500), curve: Curves.easeOut);
+
+      // Ensure the splash stays visible for at least 2.5 seconds for branding
+      final elapsed = stopwatch.elapsedMilliseconds;
+      if (elapsed < 2500) {
+        await Future.delayed(Duration(milliseconds: 2500 - elapsed));
       }
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) =>
+            transitionsBuilder: (context, animation, secondaryAnimation, child) =>
                 FadeTransition(opacity: animation, child: child),
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
       }
     } catch (e) {
+      debugPrint('Initialization Error: $e');
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const ErrorScreen()),
@@ -284,6 +334,10 @@ class _SplashScreenState extends State<SplashScreen>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    
+                    // ── Moving Loading Bar here (Away from Pizza) ──
+                    SizedBox(height: 32 * scale),
+                    _buildLoadingBar(scale),
                   ],
                 ),
               ),
@@ -318,35 +372,69 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  // ─── Dot loader ───────────────────────────────────────────────────
+  // ── Loading Bar ───────────────────────────────────────────────────
 
-  Widget _buildDotLoader(double scale) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(3, (i) {
-        return AnimatedBuilder(
-          animation: _dotController,
-          builder: (context, _) {
-            final double stagger = (i * 0.33).clamp(0.0, 1.0);
-            final double raw =
-            (_dotController.value - stagger).clamp(0.0, 1.0);
-            final double opacity = Curves.easeInOut.transform(raw);
-            return Container(
-              margin: EdgeInsets.symmetric(horizontal: 3 * scale),
-              width: 7 * scale,
-              height: 7 * scale,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withAlpha(( (0.25 + 0.6 * opacity) * 255).toInt()),
-              ),
-            );
-          },
-        );
-      }),
+  Widget _buildLoadingBar(double scale) {
+    return Container(
+      width: 160 * scale,
+      height: 4 * scale,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withAlpha(30),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: _dotController,
+            builder: (context, child) {
+              return FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: _dotController.value,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withAlpha(150),
+                        AppColors.primary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withAlpha(80),
+                        blurRadius: 8,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
   // ─── Build ────────────────────────────────────────────────────────
+
+  void _showSecurityAlert(String title, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: AppColors.primary)),
+        content: Text(message, style: GoogleFonts.poppins()),
+        actions: [
+          TextButton(
+            onPressed: () => SystemNavigator.pop(),
+            child: Text('Exit App', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -359,20 +447,18 @@ class _SplashScreenState extends State<SplashScreen>
     final double pizzaSize = contentWidth * 1.35;
     final double pizzaVisibleHeight = pizzaSize * 0.30;
 
+    final isDark = ThemeService().isDarkMode;
+
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFF8F0),
-              Color(0xFFFFF0DC),
-              Color(0xFFFFE8C8),
-            ],
-            stops: [0.0, 0.55, 1.0],
+            colors: isDark ? AppColors.bgGradientDark : AppColors.bgGradient,
+            stops: const [0.0, 0.55, 1.0],
           ),
         ),
         child: ClipRect(
@@ -417,17 +503,6 @@ class _SplashScreenState extends State<SplashScreen>
                     bottom: -(pizzaSize / 2) + pizzaVisibleHeight,
                     left: -(pizzaSize - contentWidth) / 2,
                     child: _buildPizza(contentWidth),
-                  ),
-
-                  // ── Dot loader — above pizza peek ──
-                  Positioned(
-                    bottom: pizzaVisibleHeight + 16 * scale,
-                    left: 0,
-                    right: 0,
-                    child: FadeTransition(
-                      opacity: _taglineFade,
-                      child: Center(child: _buildDotLoader(scale)),
-                    ),
                   ),
                 ],
               ),

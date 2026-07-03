@@ -26,26 +26,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  await dotenv.load(fileName: ".env");
-
-  await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL'] ?? '',
-    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-  );
-
-  // Try to initialize notifications but don't crash if it fails (common on sideloaded iOS)
-  try {
-    await NotificationService.initialize();
-  } catch (e) {
-    debugPrint('Notification Initialization Error: $e');
-  }
-
-  final themeService = ThemeService();
-  await themeService.init();
-
+  // Parallel background initialization
+  // We don't 'await' everything here so the SplashScreen can show up faster
   runApp(const MyApp());
 }
 
@@ -54,10 +36,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = ThemeService();
+    
     return ListenableBuilder(
-      listenable: ThemeService(),
+      listenable: themeService,
       builder: (context, child) {
-        final themeService = ThemeService();
         return MaterialApp(
           navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,

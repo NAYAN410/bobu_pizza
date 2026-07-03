@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,6 +20,13 @@ class _MenuTabState extends State<MenuTab> {
   int _selectedCategoryIndex = 0;
   List<CategoryModel> _categories = [];
   List<Pizza> _allItems = [];
+
+  // Search state
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearchActive = false;
+  bool _isSearching = false;
+  List<Pizza> _searchResults = [];
+  Timer? _debounce;
 
   final Map<int, List<Pizza>> _cache = {};
   final Map<int, bool> _cacheHasMore = {};
@@ -54,7 +62,36 @@ class _MenuTabState extends State<MenuTab> {
   void dispose() {
     _scrollController.dispose();
     _wheelController.dispose();
+    _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        final data = await SupabaseService.searchPizzas(query, limit: 15);
+        if (mounted) {
+          setState(() {
+            _searchResults = data.map((e) => Pizza.fromJson(e)).toList();
+            _isSearching = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Search error: $e');
+        if (mounted) setState(() => _isSearching = false);
+      }
+    });
   }
 
   Future<void> _initialFetch() async {
@@ -216,23 +253,34 @@ class _MenuTabState extends State<MenuTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header ──
           Padding(
-            padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 20 * scale, 12 * scale),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Our Menu',
-                  style: GoogleFonts.poppins(
-                    fontSize: 22 * scale,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF2D1A0E),
-                  ),
-                ),
-                Icon(Icons.search_rounded, size: 24 * scale, color: isDark ? Colors.white70 : Colors.black87),
-              ],
+            padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 16 * scale, 12 * scale),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: _isSearchActive
+                  ? _buildSearchField(scale, isDark)
+                  : Row(
+                      key: const ValueKey('header_title'),
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Our Menu',
+                          style: GoogleFonts.poppins(
+                            fontSize: 22 * scale,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF2D1A0E),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => setState(() => _isSearchActive = true),
+                          icon: Icon(Icons.search_rounded, size: 24 * scale, color: isDark ? Colors.white70 : Colors.black87),
+                        ),
+                      ],
+                    ),
             ),
           ),
+
           Expanded(
             child: Stack(
               children: [
@@ -241,36 +289,7 @@ class _MenuTabState extends State<MenuTab> {
                   children: [
                     const SizedBox(width: _sidebarWidth + 24), // Offset for floating sidebar
                     Expanded(
-                      child: _isCategoryLoading
-                          ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-                          : RefreshIndicator(
-                        onRefresh: () async {
-                          _cache.remove(_selectedCategoryIndex);
-                          await _loadCategoryItems(_selectedCategoryIndex);
-                        },
-                        color: AppColors.primary,
-                        child: _allItems.isEmpty
-                            ? _buildEmptyState(isDark)
-                            : ListView.builder(
-                          controller: _scrollController,
-                          padding: EdgeInsets.fromLTRB(0, 12 * scale, 16 * scale, 140 * scale),
-                          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                          itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == _allItems.length) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 20),
-                                child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
-                              );
-                            }
-                            final item = _allItems[index];
-                            return GestureDetector(
-                              onTap: () => _showPizzaDetails(context, item, scale, isDark),
-                              child: _buildCompactMenuCard(item, scale, isDark),
-                            );
-                          },
-                        ),
-                      ),
+                      child: _isSearchActive ? _buildSearchResults(scale, isDark) : _buildCategoryItems(scale, isDark),
                     ),
                   ],
                 ),
@@ -286,6 +305,108 @@ class _MenuTabState extends State<MenuTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField(double scale, bool isDark) {
+    return Container(
+      key: const ValueKey('header_search'),
+      height: 48 * scale,
+      padding: const EdgeInsets.only(left: 4),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+      ),
+      child: TextField(
+        controller: _searchController,
+        autofocus: true,
+        onChanged: _onSearchChanged,
+        style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white : Colors.black),
+        decoration: InputDecoration(
+          hintText: 'Search for burgers, breads...',
+          hintStyle: GoogleFonts.poppins(fontSize: 13 * scale, color: isDark ? Colors.white38 : Colors.grey),
+          prefixIcon: Icon(Icons.search_rounded, color: AppColors.primary, size: 20 * scale),
+          suffixIcon: IconButton(
+            icon: Icon(Icons.close_rounded, size: 20 * scale, color: Colors.grey),
+            onPressed: () {
+              setState(() {
+                _isSearchActive = false;
+                _searchController.clear();
+                _searchResults = [];
+                _isSearching = false;
+              });
+            },
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults(double scale, bool isDark) {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary));
+    }
+
+    if (_searchController.text.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_rounded, size: 48, color: isDark ? Colors.white10 : Colors.grey[200]),
+            const SizedBox(height: 12),
+            Text('Type to search something yummy...', style: GoogleFonts.poppins(color: isDark ? Colors.white38 : Colors.grey)),
+          ],
+        ),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return _buildEmptyState(isDark);
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.fromLTRB(0, 12 * scale, 16 * scale, 140 * scale),
+      physics: const BouncingScrollPhysics(),
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        return _buildCompactMenuCard(_searchResults[index], scale, isDark);
+      },
+    );
+  }
+
+  Widget _buildCategoryItems(double scale, bool isDark) {
+    return _isCategoryLoading
+        ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+        : RefreshIndicator(
+      onRefresh: () async {
+        _cache.remove(_selectedCategoryIndex);
+        await _loadCategoryItems(_selectedCategoryIndex);
+      },
+      color: AppColors.primary,
+      child: _allItems.isEmpty
+          ? _buildEmptyState(isDark)
+          : ListView.builder(
+        controller: _scrollController,
+        padding: EdgeInsets.fromLTRB(0, 12 * scale, 16 * scale, 140 * scale),
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        itemCount: _allItems.length + (_isMoreLoading ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _allItems.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+            );
+          }
+          final item = _allItems[index];
+          return GestureDetector(
+            onTap: () => _showPizzaDetails(context, item, scale, isDark),
+            child: _buildCompactMenuCard(item, scale, isDark),
+          );
+        },
       ),
     );
   }
