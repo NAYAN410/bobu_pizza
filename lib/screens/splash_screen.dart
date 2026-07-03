@@ -13,7 +13,6 @@ import '../services/supabase_service.dart';
 import '../services/cart_service.dart';
 import '../services/notification_service.dart';
 import '../services/theme_service.dart';
-import 'package:safe_device/safe_device.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'main_screen.dart';
@@ -151,24 +150,12 @@ class _SplashScreenState extends State<SplashScreen>
 
       // 3. Run non-blocking services & checks in parallel
       final results = await Future.wait([
-        SafeDevice.isJailBroken,
-        SafeDevice.isRealDevice,
         InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3)),
         NotificationService.initialize(),
       ]);
       _dotController.animateTo(0.70, curve: Curves.easeInOut);
 
-      bool isJailbroken = results[0] as bool;
-      bool isRealDevice = results[1] as bool;
-      final internetResult = results[2] as List<InternetAddress>;
-
-      // Security Check
-      if (isJailbroken || (!isRealDevice && !kDebugMode)) {
-        if (mounted) {
-          _showSecurityAlert('Security Breach', 'This app cannot run on rooted devices or emulators.');
-        }
-        return;
-      }
+      final internetResult = results[0] as List<InternetAddress>;
 
       // Connectivity Check
       if (internetResult.isEmpty || internetResult[0].rawAddress.isEmpty) {
@@ -417,24 +404,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   // ─── Build ────────────────────────────────────────────────────────
-
-  void _showSecurityAlert(String title, String message) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: AppColors.primary)),
-        content: Text(message, style: GoogleFonts.poppins()),
-        actions: [
-          TextButton(
-            onPressed: () => SystemNavigator.pop(),
-            child: Text('Exit App', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: AppColors.primary)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
