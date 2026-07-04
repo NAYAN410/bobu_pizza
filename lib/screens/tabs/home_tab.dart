@@ -679,6 +679,7 @@ class _HomeTabState extends State<HomeTab> {
 
   void _showPizzaDetails(BuildContext context, Pizza item, double scale, bool isDark) {
     int quantity = 1;
+    String? selectedSize = (item.sizes != null && item.sizes!.isNotEmpty) ? item.sizes!.first.name : null;
 
     showModalBottomSheet(
       context: context,
@@ -687,6 +688,9 @@ class _HomeTabState extends State<HomeTab> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final double currentUnitPrice = item.getPriceForSize(selectedSize ?? '');
+            final double totalDisplayPrice = currentUnitPrice * quantity;
+
             return Container(
               height: MediaQuery.of(context).size.height * 0.85,
               decoration: BoxDecoration(
@@ -800,6 +804,39 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                               
                               SizedBox(height: 16 * scale),
+
+                              // ── Size Selection ──
+                              if (item.sizes != null && item.sizes!.isNotEmpty) ...[
+                                Text('Select Size', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                                SizedBox(height: 12 * scale),
+                                Row(
+                                  children: item.sizes!.map((size) {
+                                    bool isSelected = selectedSize == size.name;
+                                    return GestureDetector(
+                                      onTap: () => setModalState(() => selectedSize = size.name),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        margin: EdgeInsets.only(right: 12 * scale),
+                                        padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 10 * scale),
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? AppColors.primary : (isDark ? Colors.white.withAlpha(13) : Colors.grey[100]),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: isSelected ? AppColors.primary : (isDark ? Colors.white10 : Colors.transparent)),
+                                        ),
+                                        child: Text(
+                                          size.name,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13 * scale,
+                                            fontWeight: FontWeight.bold,
+                                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                SizedBox(height: 24 * scale),
+                              ],
                               
                               // 3. Description
                               Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
@@ -832,8 +869,9 @@ class _HomeTabState extends State<HomeTab> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 if (item.discount > 0)
-                                  Text('₹${(item.price * quantity).toInt()}', style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 14)),
-                                Text('₹${(item.discountedPrice * quantity).toInt()}', style: GoogleFonts.poppins(fontSize: 22 * scale, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                  Text('₹${(item.price * (selectedSize != null ? (item.sizes!.firstWhere((s) => s.name == selectedSize).price / item.price) : 1) * quantity).toInt()}', 
+                                      style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 14)),
+                                Text('₹${totalDisplayPrice.toInt()}', style: GoogleFonts.poppins(fontSize: 22 * scale, fontWeight: FontWeight.bold, color: AppColors.primary)),
                               ],
                             ),
                           ),
@@ -852,7 +890,7 @@ class _HomeTabState extends State<HomeTab> {
                           // Add Button
                           ElevatedButton(
                             onPressed: () {
-                              CartService.addToCart(item, quantity: quantity);
+                              CartService.addToCart(item, quantity: quantity, size: selectedSize);
                               Navigator.pop(context);
                             },
                             style: ElevatedButton.styleFrom(
