@@ -151,6 +151,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'quantity': item.quantity,
         'price': item.unitPrice,
         'selected_size': item.selectedSize,
+        'selected_addons': item.selectedAddons,
       }).toList();
 
       final totalAfterDiscount = CartService.subtotal - _discountAmount;
@@ -169,6 +170,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (!mounted) return;
         setState(() => _isPlacingOrder = false);
         
+        // Add items to result map to show on success screen
+        final orderDataForSuccess = {
+          ...result,
+          'items': cartItems.map((e) => {
+            'name': e.pizza.name,
+            'quantity': e.quantity,
+            'price': e.unitPrice,
+            'size': e.selectedSize,
+            'addons': e.selectedAddons,
+            'image_url': e.pizza.imageUrl,
+          }).toList(),
+        };
+
         // Show local notification
         NotificationService.showNotification(
           title: 'Order Placed! 🍕',
@@ -177,7 +191,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => OrderSuccessScreen(orderData: result))
+          MaterialPageRoute(builder: (context) => OrderSuccessScreen(orderData: orderDataForSuccess))
         );
       }
     } catch (e) {

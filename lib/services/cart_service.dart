@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
 import '../models/cart_item_model.dart';
 import '../models/pizza_model.dart';
 import 'supabase_service.dart';
@@ -23,10 +24,16 @@ class CartService {
           .eq('user_id', user.id);
 
       final List<CartItem> loadedItems = (data as List).map((item) {
+        List<String> addons = [];
+        if (item['selected_addons'] != null) {
+          addons = List<String>.from(item['selected_addons']);
+        }
+
         return CartItem(
           pizza: Pizza.fromJson(item['pizzas']),
           quantity: item['quantity'],
-          selectedSize: item['selected_size'], // Fetched from DB
+          selectedSize: item['selected_size'],
+          selectedAddons: addons,
         );
       }).toList();
 
@@ -36,16 +43,19 @@ class CartService {
     }
   }
 
-  static Future<void> addToCart(Pizza pizza, {int quantity = 1, String? size}) async {
+  static Future<void> addToCart(Pizza pizza, {int quantity = 1, String? size, List<String> addons = const []}) async {
     final user = client.auth.currentUser;
     if (user == null) return;
 
     final currentItems = List<CartItem>.from(cartItemsNotifier.value);
     
-    // Check if the same item with same size already exists
-    final existingIndex = currentItems.indexWhere(
-      (item) => item.pizza.id == pizza.id && item.selectedSize == size
-    );
+    // Check if same pizza + size + addons exists
+    final existingIndex = currentItems.indexWhere((item) {
+      bool samePizza = item.pizza.id == pizza.id;
+      bool sameSize = item.selectedSize == size;
+      bool sameAddons = setEquals(item.selectedAddons.toSet(), addons.toSet());
+      return samePizza && sameSize && sameAddons;
+    });
 
     try {
       await SupabaseService.checkConnectivity();
@@ -56,14 +66,16 @@ class CartService {
             .update({'quantity': currentItems[existingIndex].quantity})
             .eq('user_id', user.id)
             .eq('pizza_id', pizza.id)
-            .eq('selected_size', size ?? ''); // Use empty string for null if needed or just filter
+            .eq('selected_size', size ?? '')
+            .filter('selected_addons', 'cs', jsonEncode(addons));
       } else {
-        currentItems.add(CartItem(pizza: pizza, quantity: quantity, selectedSize: size));
+        currentItems.add(CartItem(pizza: pizza, quantity: quantity, selectedSize: size, selectedAddons: addons));
         await client.from('cart_items').insert({
           'user_id': user.id,
           'pizza_id': pizza.id,
           'quantity': quantity,
           'selected_size': size,
+          'selected_addons': addons,
         });
       }
       cartItemsNotifier.value = currentItems;
@@ -72,14 +84,17 @@ class CartService {
     }
   }
 
-  static Future<void> updateQuantity(int pizzaId, int delta, {String? size}) async {
+  static Future<void> updateQuantity(int pizzaId, int delta, {String? size, List<String> addons = const []}) async {
     final user = client.auth.currentUser;
     if (user == null) return;
 
     final currentItems = List<CartItem>.from(cartItemsNotifier.value);
-    final index = currentItems.indexWhere(
-      (item) => item.pizza.id == pizzaId && item.selectedSize == size
-    );
+    final index = currentItems.indexWhere((item) {
+      bool samePizza = item.pizza.id == pizzaId;
+      bool sameSize = item.selectedSize == size;
+      bool sameAddons = setEquals(item.selectedAddons.toSet(), addons.toSet());
+      return samePizza && sameSize && sameAddons;
+    });
 
     if (index != -1) {
       final newQty = currentItems[index].quantity + delta;
@@ -92,14 +107,16 @@ class CartService {
               .delete()
               .eq('user_id', user.id)
               .eq('pizza_id', pizzaId)
-              .eq('selected_size', size ?? '');
+              .eq('selected_size', size ?? '')
+              .filter('selected_addons', 'cs', jsonEncode(addons));
         } else {
           currentItems[index].quantity = newQty;
           await client.from('cart_items')
               .update({'quantity': newQty})
               .eq('user_id', user.id)
               .eq('pizza_id', pizzaId)
-              .eq('selected_size', size ?? '');
+              .eq('selected_size', size ?? '')
+              .filter('selected_addons', 'cs', jsonEncode(addons));
         }
         cartItemsNotifier.value = currentItems;
       } catch (e) {

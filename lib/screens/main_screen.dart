@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants.dart';
 import '../services/cart_service.dart';
+import '../services/notification_service.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/menu_tab.dart';
 import 'tabs/cart_tab.dart';
@@ -56,6 +57,9 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _initAnimations();
     CartService.cartItemsNotifier.addListener(_onCartChanged);
     CartService.fetchCartFromDb();
+    
+    // Ensure order status listener is active whenever MainScreen is shown
+    NotificationService.listenToOrderStatus();
   }
 
   void _setupSystemUI() {

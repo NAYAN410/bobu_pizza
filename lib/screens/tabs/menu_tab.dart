@@ -127,6 +127,7 @@ class _MenuTabState extends State<MenuTab> {
 
     setState(() {
       _isCategoryLoading = true;
+      _isMoreLoading = false; // Reset more loading flag
       _allItems = [];
     });
 
@@ -169,14 +170,19 @@ class _MenuTabState extends State<MenuTab> {
 
       final nextItems = nextItemsData.map((e) => Pizza.fromJson(e)).toList();
 
-      if (mounted && _selectedCategoryIndex == currentIndex) {
-        setState(() {
-          _allItems.addAll(nextItems);
-          _cache[currentIndex] = List.from(_allItems);
-          _hasMore = nextItems.length == _pageSize;
-          _cacheHasMore[currentIndex] = _hasMore;
+      if (mounted) {
+        if (_selectedCategoryIndex == currentIndex) {
+          setState(() {
+            _allItems.addAll(nextItems);
+            _cache[currentIndex] = List.from(_allItems);
+            _hasMore = nextItems.length == _pageSize;
+            _cacheHasMore[currentIndex] = _hasMore;
+            _isMoreLoading = false;
+          });
+        } else {
+          // If category changed while loading, just reset the flag
           _isMoreLoading = false;
-        });
+        }
       }
     } catch (e) {
       debugPrint('Error: $e');
@@ -699,6 +705,7 @@ class _MenuTabState extends State<MenuTab> {
   void _showPizzaDetails(BuildContext context, Pizza item, double scale, bool isDark) {
     int quantity = 1;
     String? selectedSize = (item.sizes != null && item.sizes!.isNotEmpty) ? item.sizes!.first.name : null;
+    List<String> selectedAddons = [];
 
     showModalBottomSheet(
       context: context,
@@ -707,7 +714,17 @@ class _MenuTabState extends State<MenuTab> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final double currentUnitPrice = item.getPriceForSize(selectedSize ?? '');
+            // Calculate price based on size and addons
+            double currentUnitPrice = item.getPriceForSize(selectedSize ?? '');
+            
+            // Addon logic
+            final bool isSmall = selectedSize?.toLowerCase() == 'small';
+            for (var addon in selectedAddons) {
+              if (addon == 'Extra Cheese') currentUnitPrice += isSmall ? 20 : 30;
+              else if (addon == 'Paneer') currentUnitPrice += isSmall ? 30 : 50;
+              else if (addon == 'Veggie') currentUnitPrice += isSmall ? 20 : 30;
+            }
+
             final double totalDisplayPrice = currentUnitPrice * quantity;
 
             return Container(
@@ -853,6 +870,67 @@ class _MenuTabState extends State<MenuTab> {
                                 SizedBox(height: 24 * scale),
                               ],
 
+                              // ── Add-ons Selection ──
+                              if (item.category.contains('Pizza')) ...[
+                                Text('Add Extras', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                                SizedBox(height: 12 * scale),
+                                ...['Extra Cheese', 'Paneer', 'Veggie'].map((addon) {
+                                  bool isSelected = selectedAddons.contains(addon);
+                                  int price = 0;
+                                  bool isS = selectedSize?.toLowerCase() == 'small';
+                                  if (addon == 'Extra Cheese') price = isS ? 20 : 30;
+                                  else if (addon == 'Paneer') price = isS ? 30 : 50;
+                                  else if (addon == 'Veggie') price = isS ? 20 : 30;
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setModalState(() {
+                                        if (isSelected) selectedAddons.remove(addon);
+                                        else selectedAddons.add(addon);
+                                      });
+                                    },
+                                    child: Container(
+                                      margin: EdgeInsets.only(bottom: 10 * scale),
+                                      padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? AppColors.primary.withOpacity(0.1) : (isDark ? Colors.white.withOpacity(0.02) : Colors.grey[50]),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: isSelected ? AppColors.primary : (isDark ? Colors.white10 : Colors.grey[200]!)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                            color: isSelected ? AppColors.primary : Colors.grey,
+                                            size: 20 * scale,
+                                          ),
+                                          SizedBox(width: 12 * scale),
+                                          Expanded(
+                                            child: Text(
+                                              addon,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 14 * scale,
+                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                                color: isDark ? Colors.white : Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            '+₹$price',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 13 * scale,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                SizedBox(height: 24 * scale),
+                              ],
+
                               Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                               SizedBox(height: 8 * scale),
                               Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white60 : AppColors.textGrey, height: 1.5)),
@@ -900,7 +978,7 @@ class _MenuTabState extends State<MenuTab> {
                           SizedBox(width: 16 * scale),
                           ElevatedButton(
                             onPressed: () {
-                              CartService.addToCart(item, quantity: quantity, size: selectedSize);
+                              CartService.addToCart(item, quantity: quantity, size: selectedSize, addons: selectedAddons);
                               Navigator.pop(context);
                             },
                             style: ElevatedButton.styleFrom(

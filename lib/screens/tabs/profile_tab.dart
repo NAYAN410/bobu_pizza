@@ -359,7 +359,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 return Column(
                   children: [
                     GestureDetector(
-                      onTap: () async {
+                        onTap: () async {
                         if (item.label == 'Saved Addresses') {
                           Navigator.pushNamed(context, '/addresses');
                         } else if (item.label == 'Edit Profile') {

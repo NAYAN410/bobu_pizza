@@ -53,14 +53,13 @@ class _SplashScreenState extends State<SplashScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light, // White icons for dark splash
+      statusBarIconBrightness: Brightness.light, 
       systemNavigationBarColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.light,
     ));
   }
 
   void _initControllers() {
-    // Logo zoom + fade
     _logoController = AnimationController(
       duration: const Duration(milliseconds: 900),
       vsync: this,
@@ -72,7 +71,6 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _logoController, curve: Curves.easeIn),
     );
 
-    // Tagline slide up + fade
     _taglineController = AnimationController(
       duration: const Duration(milliseconds: 700),
       vsync: this,
@@ -87,7 +85,6 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _taglineController, curve: Curves.easeOutCubic),
     );
 
-    // Pizza slide up + fade
     _pizzaController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -102,13 +99,11 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _pizzaController, curve: Curves.easeIn),
     );
 
-    // Continuous pizza rotation
     _rotationController = AnimationController(
       duration: const Duration(seconds: 22),
       vsync: this,
     )..repeat();
 
-    // Progress bar fill animation — will be manually controlled by initialization steps
     _dotController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -116,58 +111,54 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _runSequence() async {
-    // Logo zooms in immediately
     _logoController.forward();
-
-    // Tagline slides up after 500ms
     await Future.delayed(const Duration(milliseconds: 500));
     if (mounted) _taglineController.forward();
-
-    // Pizza slides up after 900ms
     await Future.delayed(const Duration(milliseconds: 400));
     if (mounted) _pizzaController.forward();
   }
 
   Future<void> _initializeApp() async {
-    // We start animations immediately, and run init tasks in parallel
     final stopwatch = Stopwatch()..start();
 
     try {
-      // 1. Critical Parallel Initializations (Core services)
+      // 1. Load basic configs first
       await Future.wait([
-        Firebase.initializeApp(),
         dotenv.load(fileName: ".env"),
         ThemeService().init(),
       ]);
-      _dotController.animateTo(0.25, curve: Curves.easeInOut);
+      _dotController.animateTo(0.2, curve: Curves.easeInOut);
 
-      // 2. Supabase depends on dotenv
-      await Supabase.initialize(
-        url: dotenv.env['SUPABASE_URL'] ?? '',
-        anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-      );
-      _dotController.animateTo(0.45, curve: Curves.easeInOut);
-
-      // 3. Run non-blocking services & checks in parallel
-      final results = await Future.wait([
-        InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3)),
-        NotificationService.initialize(),
-      ]);
-      _dotController.animateTo(0.70, curve: Curves.easeInOut);
-
-      final internetResult = results[0] as List<InternetAddress>;
-
-      // Connectivity Check
-      if (internetResult.isEmpty || internetResult[0].rawAddress.isEmpty) {
-        throw Exception('No internet');
+      // 2. Initialize Supabase (Must be before NotificationService)
+      final supabaseUrl = dotenv.env['SUPABASE_URL'];
+      final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
+      
+      if (supabaseUrl == null || supabaseAnonKey == null) {
+        throw Exception('Keys missing');
       }
 
-      // 4. Auth & Navigation logic
+      await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+      _dotController.animateTo(0.5, curve: Curves.easeInOut);
+
+      // 3. Now initialize Notification Service safely
+      await NotificationService.initialize();
+      _dotController.animateTo(0.7, curve: Curves.easeInOut);
+
+      // 4. Background checks
+      try {
+        await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
+      } catch (_) {}
+      _dotController.animateTo(0.85, curve: Curves.easeInOut);
+
       Widget nextScreen;
       try {
         final prefs = await SharedPreferences.getInstance();
         final bool isFirstTime = prefs.getBool('is_first_time') ?? true;
-        final user = await SupabaseService.getCurrentUser();
+        
+        final user = await SupabaseService.getCurrentUser().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => null,
+        );
 
         if (user != null) {
           await CartService.fetchCartFromDb();
@@ -179,14 +170,11 @@ class _SplashScreenState extends State<SplashScreen>
           nextScreen = const LoginScreen();
         }
       } catch (e) {
-        final prefs = await SharedPreferences.getInstance();
-        final bool isFirstTime = prefs.getBool('is_first_time') ?? true;
-        nextScreen = isFirstTime ? const OnboardingScreen() : const LoginScreen();
+        nextScreen = const LoginScreen();
       }
 
       _dotController.animateTo(1.0, duration: const Duration(milliseconds: 500), curve: Curves.easeOut);
 
-      // Ensure the splash stays visible for at least 2.5 seconds for branding
       final elapsed = stopwatch.elapsedMilliseconds;
       if (elapsed < 2500) {
         await Future.delayed(Duration(milliseconds: 2500 - elapsed));
@@ -203,7 +191,6 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } catch (e) {
-      debugPrint('Initialization Error: $e');
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const ErrorScreen()),
@@ -230,13 +217,8 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  // ─── Scale helpers ────────────────────────────────────────────────
-
   double _getScale(double w) => (w / 375).clamp(0.8, 1.2);
-
   double _getContentWidth(double w) => w.clamp(0, 430);
-
-  // ─── Logo block ───────────────────────────────────────────────────
 
   Widget _buildLogo(double scale) {
     return FadeTransition(
@@ -247,7 +229,6 @@ class _SplashScreenState extends State<SplashScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // "Bobu"
             Text(
               'Bobu',
               textAlign: TextAlign.center,
@@ -265,8 +246,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ],
               ),
             ),
-
-            // Decorative divider
             Padding(
               padding: EdgeInsets.symmetric(vertical: 5 * scale),
               child: Row(
@@ -293,8 +272,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ],
               ),
             ),
-
-            // "Pizza" + tagline — staggered in
             SlideTransition(
               position: _taglineSlide,
               child: FadeTransition(
@@ -321,8 +298,6 @@ class _SplashScreenState extends State<SplashScreen>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    
-                    // ── Moving Loading Bar here (Away from Pizza) ──
                     SizedBox(height: 32 * scale),
                     _buildLoadingBar(scale),
                   ],
@@ -335,11 +310,8 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  // ─── Pizza image ──────────────────────────────────────────────────
-
   Widget _buildPizza(double contentWidth) {
     final double pizzaSize = contentWidth * 1.35;
-
     return SlideTransition(
       position: _pizzaSlide,
       child: FadeTransition(
@@ -358,8 +330,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
   }
-
-  // ── Loading Bar ───────────────────────────────────────────────────
 
   Widget _buildLoadingBar(double scale) {
     return Container(
@@ -403,8 +373,6 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  // ─── Build ────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -412,10 +380,8 @@ class _SplashScreenState extends State<SplashScreen>
     final double sh = size.height;
     final double contentWidth = _getContentWidth(sw);
     final double scale = _getScale(sw);
-
     final double pizzaSize = contentWidth * 1.35;
     final double pizzaVisibleHeight = pizzaSize * 0.30;
-
     final isDark = ThemeService().isDarkMode;
 
     return Scaffold(
@@ -439,8 +405,6 @@ class _SplashScreenState extends State<SplashScreen>
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-
-                  // ── Sauce splash (top-left decoration) ──
                   Positioned(
                     top: -30 * scale,
                     left: -contentWidth * 0.15,
@@ -456,8 +420,6 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                   ),
-
-                  // ── Logo — perfectly centered ──
                   Positioned(
                     top: (sh / 2) - (pizzaVisibleHeight / 2) - (160 * scale),
                     left: 0,
@@ -466,8 +428,6 @@ class _SplashScreenState extends State<SplashScreen>
                       child: _buildLogo(scale),
                     ),
                   ),
-
-                  // ── Pizza — bottom overflow ──
                   Positioned(
                     bottom: -(pizzaSize / 2) + pizzaVisibleHeight,
                     left: -(pizzaSize - contentWidth) / 2,

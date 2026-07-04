@@ -173,9 +173,9 @@ class _CartTabState extends State<CartTab> {
                     color: AppColors.primary,
                   ),
                 ),
-                if (item.selectedSize != null)
+                if (item.selectedSize != null || item.selectedAddons.isNotEmpty)
                   Text(
-                    'Size: ${item.selectedSize}',
+                    '${item.selectedSize ?? ""}${item.selectedAddons.isNotEmpty ? " • +${item.selectedAddons.join(", ")}" : ""}',
                     style: GoogleFonts.poppins(
                       fontSize: 10 * scale,
                       color: isDark ? Colors.white38 : Colors.grey,

@@ -197,25 +197,46 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
             child: Column(
               children: items.map((item) {
                 final pizza = item['pizzas'];
+                if (pizza == null) return const SizedBox.shrink();
+
+                final String size = item['selected_size'] ?? '';
+                
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
                       Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(color: AppColors.primary.withAlpha(26), borderRadius: BorderRadius.circular(8)),
+                        width: 45, height: 45,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withAlpha(10) : const Color(0xFFFFF0DC), 
+                          borderRadius: BorderRadius.circular(10)
+                        ),
                         child: pizza['image_url'] != null 
                           ? Image.network(pizza['image_url'], fit: BoxFit.contain, errorBuilder: (context, error, stackTrace) => const Icon(Icons.local_pizza, color: AppColors.primary))
                           : const Icon(Icons.local_pizza, color: AppColors.primary),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 14),
                       Expanded(
-                        child: Text(
-                          '${item['quantity']} x ${pizza['name']}',
-                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pizza['name'] ?? 'Pizza',
+                              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                            ),
+                            Text(
+                              'Qty: ${item['quantity']} ${size.isNotEmpty ? '• $size' : ''}',
+                              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey),
+                            ),
+                            if (item['selected_addons'] != null && (item['selected_addons'] as List).isNotEmpty)
+                              Text(
+                                '+ ${(item['selected_addons'] as List).join(", ")}',
+                                style: GoogleFonts.poppins(fontSize: 10, color: AppColors.primary.withOpacity(0.7)),
+                              ),
+                          ],
                         ),
                       ),
-                      Text('₹${item['price'].toInt()}', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text('₹${item['price'].toInt()}', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
                     ],
                   ),
                 );

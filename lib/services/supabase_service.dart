@@ -138,6 +138,7 @@ class SupabaseService {
       'quantity': item['quantity'],
       'price': item['price'],
       'selected_size': item['selected_size'],
+      'selected_addons': item['selected_addons'],
     }).toList();
 
     await client.from('order_items').insert(orderItems);
@@ -154,6 +155,8 @@ class SupabaseService {
       'id': customOrderId,
       'delivery_pin': deliveryPin,
       'total': totalAmount,
+      'payment_mode': paymentMode,
+      'address': address,
     };
   }
 

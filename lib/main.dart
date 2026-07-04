@@ -25,9 +25,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Essential initializations that MUST happen before anything else
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase Init Error: $e');
+  }
 
-  // Parallel background initialization
-  // We don't 'await' everything here so the SplashScreen can show up faster
   runApp(const MyApp());
 }
 
