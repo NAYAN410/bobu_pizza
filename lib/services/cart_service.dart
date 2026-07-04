@@ -26,6 +26,7 @@ class CartService {
         return CartItem(
           pizza: Pizza.fromJson(item['pizzas']),
           quantity: item['quantity'],
+          selectedSize: item['selected_size'], // Fetched from DB
         );
       }).toList();
 
@@ -35,12 +36,16 @@ class CartService {
     }
   }
 
-  static Future<void> addToCart(Pizza pizza, {int quantity = 1}) async {
+  static Future<void> addToCart(Pizza pizza, {int quantity = 1, String? size}) async {
     final user = client.auth.currentUser;
     if (user == null) return;
 
     final currentItems = List<CartItem>.from(cartItemsNotifier.value);
-    final existingIndex = currentItems.indexWhere((item) => item.pizza.id == pizza.id);
+    
+    // Check if the same item with same size already exists
+    final existingIndex = currentItems.indexWhere(
+      (item) => item.pizza.id == pizza.id && item.selectedSize == size
+    );
 
     try {
       await SupabaseService.checkConnectivity();
@@ -50,13 +55,15 @@ class CartService {
             .from('cart_items')
             .update({'quantity': currentItems[existingIndex].quantity})
             .eq('user_id', user.id)
-            .eq('pizza_id', pizza.id);
+            .eq('pizza_id', pizza.id)
+            .eq('selected_size', size ?? ''); // Use empty string for null if needed or just filter
       } else {
-        currentItems.add(CartItem(pizza: pizza, quantity: quantity));
+        currentItems.add(CartItem(pizza: pizza, quantity: quantity, selectedSize: size));
         await client.from('cart_items').insert({
           'user_id': user.id,
           'pizza_id': pizza.id,
           'quantity': quantity,
+          'selected_size': size,
         });
       }
       cartItemsNotifier.value = currentItems;
@@ -65,12 +72,14 @@ class CartService {
     }
   }
 
-  static Future<void> updateQuantity(int pizzaId, int delta) async {
+  static Future<void> updateQuantity(int pizzaId, int delta, {String? size}) async {
     final user = client.auth.currentUser;
     if (user == null) return;
 
     final currentItems = List<CartItem>.from(cartItemsNotifier.value);
-    final index = currentItems.indexWhere((item) => item.pizza.id == pizzaId);
+    final index = currentItems.indexWhere(
+      (item) => item.pizza.id == pizzaId && item.selectedSize == size
+    );
 
     if (index != -1) {
       final newQty = currentItems[index].quantity + delta;
@@ -79,10 +88,18 @@ class CartService {
         await SupabaseService.checkConnectivity();
         if (newQty <= 0) {
           currentItems.removeAt(index);
-          await client.from('cart_items').delete().eq('user_id', user.id).eq('pizza_id', pizzaId);
+          await client.from('cart_items')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('pizza_id', pizzaId)
+              .eq('selected_size', size ?? '');
         } else {
           currentItems[index].quantity = newQty;
-          await client.from('cart_items').update({'quantity': newQty}).eq('user_id', user.id).eq('pizza_id', pizzaId);
+          await client.from('cart_items')
+              .update({'quantity': newQty})
+              .eq('user_id', user.id)
+              .eq('pizza_id', pizzaId)
+              .eq('selected_size', size ?? '');
         }
         cartItemsNotifier.value = currentItems;
       } catch (e) {

@@ -698,6 +698,7 @@ class _MenuTabState extends State<MenuTab> {
 
   void _showPizzaDetails(BuildContext context, Pizza item, double scale, bool isDark) {
     int quantity = 1;
+    String? selectedSize = (item.sizes != null && item.sizes!.isNotEmpty) ? item.sizes!.first.name : null;
 
     showModalBottomSheet(
       context: context,
@@ -706,6 +707,9 @@ class _MenuTabState extends State<MenuTab> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final double currentUnitPrice = item.getPriceForSize(selectedSize ?? '');
+            final double totalDisplayPrice = currentUnitPrice * quantity;
+
             return Container(
               height: MediaQuery.of(context).size.height * 0.85,
               decoration: BoxDecoration(
@@ -815,23 +819,43 @@ class _MenuTabState extends State<MenuTab> {
                                 ],
                               ),
                               SizedBox(height: 16 * scale),
+                              
+                              // ── Size Selection ──
+                              if (item.sizes != null && item.sizes!.isNotEmpty) ...[
+                                Text('Select Size', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                                SizedBox(height: 12 * scale),
+                                Row(
+                                  children: item.sizes!.map((size) {
+                                    bool isSelected = selectedSize == size.name;
+                                    return GestureDetector(
+                                      onTap: () => setModalState(() => selectedSize = size.name),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        margin: EdgeInsets.only(right: 12 * scale),
+                                        padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 10 * scale),
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: isSelected ? AppColors.primary : (isDark ? Colors.white10 : Colors.transparent)),
+                                        ),
+                                        child: Text(
+                                          size.name,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13 * scale,
+                                            fontWeight: FontWeight.bold,
+                                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                SizedBox(height: 24 * scale),
+                              ],
+
                               Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                               SizedBox(height: 8 * scale),
                               Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white60 : AppColors.textGrey, height: 1.5)),
-                              SizedBox(height: 24 * scale),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey[50], borderRadius: BorderRadius.circular(16)),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.info_outline, color: Colors.blue),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text('Customization options coming soon!', style: GoogleFonts.poppins(fontSize: 12 * scale, color: isDark ? Colors.blue[200] : Colors.blue[800])),
-                                    ),
-                                  ],
-                                ),
-                              ),
                               SizedBox(height: 100 * scale),
                             ],
                           ),
@@ -857,8 +881,9 @@ class _MenuTabState extends State<MenuTab> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 if (item.discount > 0)
-                                  Text('₹${(item.price * quantity).toInt()}', style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 14)),
-                                Text('₹${(item.discountedPrice * quantity).toInt()}', style: GoogleFonts.poppins(fontSize: 22 * scale, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                  Text('₹${(item.price * (selectedSize != null ? (item.sizes!.firstWhere((s) => s.name == selectedSize).price / item.price) : 1) * quantity).toInt()}', 
+                                      style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 14)),
+                                Text('₹${totalDisplayPrice.toInt()}', style: GoogleFonts.poppins(fontSize: 22 * scale, fontWeight: FontWeight.bold, color: AppColors.primary)),
                               ],
                             ),
                           ),
@@ -875,7 +900,7 @@ class _MenuTabState extends State<MenuTab> {
                           SizedBox(width: 16 * scale),
                           ElevatedButton(
                             onPressed: () {
-                              CartService.addToCart(item, quantity: quantity);
+                              CartService.addToCart(item, quantity: quantity, size: selectedSize);
                               Navigator.pop(context);
                             },
                             style: ElevatedButton.styleFrom(

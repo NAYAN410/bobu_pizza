@@ -149,7 +149,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final List<Map<String, dynamic>> orderItems = cartItems.map((item) => {
         'pizza_id': item.pizza.id,
         'quantity': item.quantity,
-        'price': item.pizza.discountedPrice,
+        'price': item.unitPrice,
+        'selected_size': item.selectedSize,
       }).toList();
 
       final totalAfterDiscount = CartService.subtotal - _discountAmount;

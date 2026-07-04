@@ -166,13 +166,21 @@ class _CartTabState extends State<CartTab> {
                 ),
                 SizedBox(height: 3 * scale),
                 Text(
-                  '₹${pizza.discountedPrice.toInt()}',
+                  '₹${item.unitPrice.toInt()}',
                   style: GoogleFonts.poppins(
                     fontSize: 13 * scale,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary,
                   ),
                 ),
+                if (item.selectedSize != null)
+                  Text(
+                    'Size: ${item.selectedSize}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10 * scale,
+                      color: isDark ? Colors.white38 : Colors.grey,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -184,7 +192,7 @@ class _CartTabState extends State<CartTab> {
                 icon: Icons.remove_rounded,
                 scale: scale,
                 isDark: isDark,
-                onTap: () => CartService.updateQuantity(pizza.id, -1),
+                onTap: () => CartService.updateQuantity(pizza.id, -1, size: item.selectedSize),
               ),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 10 * scale),
@@ -202,7 +210,7 @@ class _CartTabState extends State<CartTab> {
                 scale: scale,
                 isDark: isDark,
                 filled: true,
-                onTap: () => CartService.updateQuantity(pizza.id, 1),
+                onTap: () => CartService.updateQuantity(pizza.id, 1, size: item.selectedSize),
               ),
             ],
           ),

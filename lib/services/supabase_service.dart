@@ -137,6 +137,7 @@ class SupabaseService {
       'pizza_id': item['pizza_id'],
       'quantity': item['quantity'],
       'price': item['price'],
+      'selected_size': item['selected_size'],
     }).toList();
 
     await client.from('order_items').insert(orderItems);
