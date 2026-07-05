@@ -15,11 +15,18 @@ class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<MainScreen> createState() => MainScreenState();
+
+  static MainScreenState? of(BuildContext context) =>
+      context.findAncestorStateOfType<MainScreenState>();
 }
 
-class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
+class MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
+
+  void setIndex(int index) {
+    _onItemTapped(index);
+  }
 
   static const double _navBarHeight = 68.0;
   static const double _navBarHorizontalMargin = 20.0;

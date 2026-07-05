@@ -46,3 +46,21 @@ app.*.map.json
 
 # Environment variables (Secrets)
 .env
+
+# Android sensitive files
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+android/local.properties
+
+# iOS sensitive/build files
+ios/Flutter/Generated.xcconfig
+ios/Flutter/Flutter.podspec
+ios/Pods/
+ios/.symlinks/
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+
+# Firebase (uncomment if you want to keep them private)
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist

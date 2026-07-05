@@ -192,7 +192,7 @@ class _CartTabState extends State<CartTab> {
                 icon: Icons.remove_rounded,
                 scale: scale,
                 isDark: isDark,
-                onTap: () => CartService.updateQuantity(pizza.id, -1, size: item.selectedSize),
+                onTap: () => CartService.updateQuantity(pizza.id, -1, size: item.selectedSize, addons: item.selectedAddons),
               ),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 10 * scale),
@@ -210,7 +210,7 @@ class _CartTabState extends State<CartTab> {
                 scale: scale,
                 isDark: isDark,
                 filled: true,
-                onTap: () => CartService.updateQuantity(pizza.id, 1, size: item.selectedSize),
+                onTap: () => CartService.updateQuantity(pizza.id, 1, size: item.selectedSize, addons: item.selectedAddons),
               ),
             ],
           ),

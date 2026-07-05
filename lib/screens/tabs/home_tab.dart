@@ -8,6 +8,8 @@ import '../../models/pizza_model.dart';
 import '../../models/category_model.dart';
 import '../../models/banner_model.dart';
 import '../../services/cart_service.dart';
+import '../../services/location_service.dart';
+import '../main_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -25,6 +27,8 @@ class _HomeTabState extends State<HomeTab> {
   List<BannerModel> _banners = [];
   List<CategoryModel> _categories = [];
   List<Pizza> _popularPizzas = [];
+  Map<String, dynamic>? _lastDeliveredOrder;
+  String _currentAddress = "Fetching location...";
   bool _isLoading = true;
   int _activeCategoryIndex = 0;
 
@@ -40,11 +44,13 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadAllData() async {
+    _fetchLocation(); // Start fetching location in parallel
     try {
       final results = await Future.wait([
         SupabaseService.getBanners(),
         SupabaseService.getCategories(),
         SupabaseService.getPopularPizzas(),
+        SupabaseService.getUserOrders(),
       ]);
 
       if (mounted) {
@@ -52,6 +58,14 @@ class _HomeTabState extends State<HomeTab> {
           _banners = (results[0] as List).map((e) => BannerModel.fromJson(e)).toList();
           _categories = (results[1] as List).map((e) => CategoryModel.fromJson(e)).toList();
           _popularPizzas = (results[2] as List).map((e) => Pizza.fromJson(e)).toList();
+          
+          final orders = results[3] as List<Map<String, dynamic>>;
+          _lastDeliveredOrder = orders.firstWhere(
+            (o) => o['status'].toString().toLowerCase() == 'delivered',
+            orElse: () => {},
+          );
+          if (_lastDeliveredOrder!.isEmpty) _lastDeliveredOrder = null;
+
           _isLoading = false;
         });
         _startBannerTimer();
@@ -60,6 +74,23 @@ class _HomeTabState extends State<HomeTab> {
       debugPrint('Error loading home data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _fetchLocation() async {
+    try {
+      final address = await LocationService.getCurrentAddress();
+      if (mounted) {
+        setState(() {
+          _currentAddress = address;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _currentAddress = "Location error";
+        });
       }
     }
   }
@@ -113,6 +144,20 @@ class _HomeTabState extends State<HomeTab> {
     return 'Good Night 🌙';
   }
 
+  void _showTopSnackBar(BuildContext context, String message) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => _TopSnackBarWidget(
+        message: message,
+        onDismiss: () => overlayEntry.remove(),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+  }
+
   @override
   void dispose() {
     _bannerTimer?.cancel();
@@ -143,12 +188,19 @@ class _HomeTabState extends State<HomeTab> {
                 _buildHeader(scale, isDark),
                 _buildSearchBar(scale, isDark),
                 if (_banners.isNotEmpty) _buildBannerCarousel(scale, contentWidth),
-                _buildSectionHeader('Categories', scale, isDark),
-                if (_categories.isNotEmpty) _buildCategories(scale, isDark),
+                
+                // ── Cafe Timing Indicator ──
+                _buildCafeTimingIndicator(scale, isDark),
+                
+                if (_lastDeliveredOrder != null) ...[
+                  _buildSectionHeaderWithAction('Recent Order', 'See all', scale, isDark, () {
+                    MainScreen.of(context)?.setIndex(3);
+                  }),
+                  _buildLastOrderCard(_lastDeliveredOrder!, scale, isDark),
+                ],
+
                 _buildSectionHeader('Popular Pizzas', scale, isDark),
                 if (_popularPizzas.isNotEmpty) _buildVerticalPizzaList(scale, isDark),
-                _buildSectionHeader('Why Choose Us?', scale, isDark),
-                _buildWhyUs(scale, isDark),
                 SizedBox(height: 120 * scale), // Space for floating nav bar
               ],
             ),
@@ -170,15 +222,39 @@ class _HomeTabState extends State<HomeTab> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_getGreeting(),
-                style: GoogleFonts.poppins(fontSize: 13 * scale, color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(128), fontWeight: FontWeight.w500)),
-              SizedBox(height: 2 * scale),
-              Text('What\'s your craving?',
-                style: GoogleFonts.poppins(fontSize: 20 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.location_on_rounded, 
+                      color: AppColors.primary, 
+                      size: 14 * scale
+                    ),
+                    SizedBox(width: 4 * scale),
+                    Expanded(
+                      child: Text(
+                        _currentAddress,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11 * scale,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8 * scale),
+                Text(_getGreeting(),
+                  style: GoogleFonts.poppins(fontSize: 13 * scale, color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(128), fontWeight: FontWeight.w500)),
+                SizedBox(height: 2 * scale),
+                Text('What\'s your craving?',
+                  style: GoogleFonts.poppins(fontSize: 20 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
+              ],
+            ),
           ),
           Stack(
             children: [
@@ -377,12 +453,124 @@ class _HomeTabState extends State<HomeTab> {
   Widget _buildSectionHeader(String title, double scale, bool isDark) {
     return Padding(
       padding: EdgeInsets.fromLTRB(20 * scale, 20 * scale, 20 * scale, 12 * scale),
+      child: Text(title, style: GoogleFonts.poppins(fontSize: 17 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
+    );
+  }
+
+  Widget _buildSectionHeaderWithAction(String title, String action, double scale, bool isDark, VoidCallback onTap) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20 * scale, 20 * scale, 20 * scale, 12 * scale),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: GoogleFonts.poppins(fontSize: 17 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
-          Text('View all', style: GoogleFonts.poppins(fontSize: 13 * scale, fontWeight: FontWeight.w600, color: AppColors.primary)),
+          GestureDetector(
+            onTap: onTap,
+            child: Text(action, style: GoogleFonts.poppins(fontSize: 13 * scale, fontWeight: FontWeight.w600, color: AppColors.primary)),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLastOrderCard(Map<String, dynamic> order, double scale, bool isDark) {
+    final items = order['order_items'] as List;
+    final firstItem = items.isNotEmpty ? items[0]['pizzas'] : null;
+    
+    return GestureDetector(
+      onTap: () => MainScreen.of(context)?.setIndex(3),
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 20 * scale),
+        padding: EdgeInsets.all(16 * scale),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withAlpha(13) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
+          boxShadow: isDark ? [] : [
+            BoxShadow(
+              color: const Color(0xFF2D1A0E).withAlpha(10),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50 * scale,
+              height: 50 * scale,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withAlpha(10) : const Color(0xFFFFF0DC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: firstItem != null && firstItem['image_url'] != null
+                    ? Image.network(firstItem['image_url'], fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.local_pizza_outlined, color: AppColors.primary))
+                    : const Icon(Icons.local_pizza_outlined, color: AppColors.primary),
+              ),
+            ),
+            SizedBox(width: 14 * scale),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Order #${order['id'].toString().substring(0, 8)}...',
+                    style: GoogleFonts.poppins(fontSize: 14 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                  ),
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: Colors.green, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Delivered',
+                        style: GoogleFonts.poppins(fontSize: 11 * scale, color: Colors.green, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            // Repeat Order Button
+            ElevatedButton(
+              onPressed: () async {
+                final List items = order['order_items'];
+                for (var item in items) {
+                  final pizzaData = item['pizzas'];
+                  if (pizzaData != null) {
+                    final pizza = Pizza.fromJson(pizzaData);
+                    await CartService.addToCart(
+                      pizza, 
+                      quantity: item['quantity'] ?? 1,
+                      size: item['selected_size'],
+                      addons: (item['selected_addons'] as List?)?.map((e) => e.toString()).toList() ?? [],
+                    );
+                  }
+                }
+                if (mounted) {
+                  _showTopSnackBar(context, 'Order repeated! Items added to cart.');
+                  MainScreen.of(context)?.setIndex(2); // Go to Cart Tab
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary.withAlpha(26),
+                foregroundColor: AppColors.primary,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 8 * scale),
+                minimumSize: Size.zero,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                'Repeat',
+                style: GoogleFonts.poppins(fontSize: 12 * scale, fontWeight: FontWeight.bold),
+              ),
+            ),
+            SizedBox(width: 8 * scale),
+            Icon(Icons.arrow_forward_ios_rounded, size: 12 * scale, color: Colors.grey[400]),
+          ],
+        ),
       ),
     );
   }
@@ -674,6 +862,90 @@ class _HomeTabState extends State<HomeTab> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildCafeTimingIndicator(double scale, bool isDark) {
+    final now = DateTime.now();
+    final currentHour = now.hour;
+    // Open from 12 PM (12) to 10 PM (22)
+    final isOpen = currentHour >= 12 && currentHour < 22;
+    
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 8 * scale),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withAlpha(13) : Colors.white.withAlpha(150),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  height: 10 * scale,
+                  width: 10 * scale,
+                  decoration: BoxDecoration(
+                    color: isOpen ? Colors.green : Colors.red,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isOpen ? Colors.green : Colors.red).withAlpha(100),
+                        blurRadius: 6,
+                        spreadRadius: 2,
+                      )
+                    ],
+                  ),
+                ),
+                SizedBox(width: 12 * scale),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isOpen ? 'We\'re Open Now!' : 'We\'re Currently Closed',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13 * scale,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        'Cafe Hours: 12:00 PM - 10:00 PM',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11 * scale,
+                          color: isDark ? Colors.white38 : Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isOpen)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withAlpha(26),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Closed',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10 * scale,
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1017,6 +1289,128 @@ class _HomeTabState extends State<HomeTab> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+class _TopSnackBarWidget extends StatefulWidget {
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _TopSnackBarWidget({required this.message, required this.onDismiss});
+
+  @override
+  State<_TopSnackBarWidget> createState() => _TopSnackBarWidgetState();
+}
+
+class _TopSnackBarWidgetState extends State<_TopSnackBarWidget> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _offsetAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _offsetAnimation = Tween<Offset>(
+      begin: const Offset(0.0, -1.5),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+    ));
+
+    _controller.forward();
+
+    // Auto dismiss after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () async {
+      if (mounted) {
+        await _controller.reverse();
+        widget.onDismiss();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: SlideTransition(
+            position: _offsetAnimation,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: sw * 0.9,
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isDark 
+                          ? Colors.white.withAlpha(20) 
+                          : AppColors.primary.withAlpha(25),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withAlpha(30) : AppColors.primary.withAlpha(60),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(isDark ? 60 : 20),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withAlpha(40),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              widget.message,
+                              style: GoogleFonts.poppins(
+                                color: isDark ? Colors.white : const Color(0xFF2D1A0E),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
