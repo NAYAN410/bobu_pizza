@@ -50,12 +50,16 @@ class SupabaseService {
   }
 
   // Database Methods
-  static Future<List<Map<String, dynamic>>> getPizzas({String? category, int from = 0, int to = 3}) async {
+  static Future<List<Map<String, dynamic>>> getPizzas({String? category, String? tag, int from = 0, int to = 3}) async {
     await checkConnectivity();
     var query = client.from('pizzas').select();
     
     if (category != null && category.toLowerCase() != 'all') {
       query = query.eq('category', category);
+    }
+
+    if (tag != null) {
+      query = query.eq('tag', tag);
     }
     
     final data = await query.order('id', ascending: true).range(from, to);
@@ -293,5 +297,24 @@ class SupabaseService {
         debugPrint('Error in updateFcmToken: $e');
       }
     }
+  }
+
+  // Notification Methods
+  static Future<List<Map<String, dynamic>>> getNotifications() async {
+    await checkConnectivity();
+    final user = client.auth.currentUser;
+    if (user == null) return [];
+
+    final data = await client
+        .from('notifications')
+        .select()
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false);
+    
+    return List<Map<String, dynamic>>.from(data);
+  }
+
+  static Future<void> markNotificationAsRead(String id) async {
+    await client.from('notifications').update({'is_read': true}).eq('id', id);
   }
 }

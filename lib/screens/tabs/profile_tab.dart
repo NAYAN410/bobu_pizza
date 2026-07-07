@@ -148,7 +148,6 @@ class _ProfileTabState extends State<ProfileTab> {
             [
               _MenuItem(Icons.notifications_none_rounded, 'Notifications',     false),
               _MenuItem(Icons.language_rounded,            'Language',          false),
-              _MenuItem(Icons.dark_mode_outlined,          'Dark Mode',         true),
             ],
             scale,
             context,
@@ -404,37 +403,12 @@ class _ProfileTabState extends State<ProfileTab> {
                                 ),
                               ),
                             ),
-                            if (item.label == 'Dark Mode')
-                              DropdownButton<AppThemeMode>(
-                                value: ThemeService().modeSetting,
-                                underline: const SizedBox(),
-                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary, size: 20 * scale),
-                                items: [
-                                  DropdownMenuItem(value: AppThemeMode.system, child: Text('System', style: GoogleFonts.poppins(fontSize: 12 * scale))),
-                                  DropdownMenuItem(value: AppThemeMode.light, child: Text('Light', style: GoogleFonts.poppins(fontSize: 12 * scale))),
-                                  DropdownMenuItem(value: AppThemeMode.dark, child: Text('Dark', style: GoogleFonts.poppins(fontSize: 12 * scale))),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) ThemeService().setThemeMode(val);
-                                },
-                              )
-                            else if (item.hasToggle)
-                              Switch(
-                                value: ThemeService().isDarkMode,
-                                onChanged: (val) {
-                                  ThemeService().toggleTheme();
-                                },
-                                activeTrackColor: AppColors.primary,
-                                materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                              )
-                            else
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                color: isDark ? Colors.white24 : const Color(0xFF2D1A0E)
-                                    .withOpacity(0.3),
-                                size: 20 * scale,
-                              ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E)
+                                  .withValues(alpha: 0.3),
+                              size: 20 * scale,
+                            ),
                           ],
                         ),
                       ),

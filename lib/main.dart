@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/splash_screen.dart';
@@ -14,7 +13,6 @@ import 'screens/edit_profile_screen.dart';
 import 'screens/help_faq_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'services/theme_service.dart';
-import 'services/notification_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -64,6 +62,12 @@ class MyApp extends StatelessWidget {
             ),
             useMaterial3: true,
             scaffoldBackgroundColor: const Color(0xFF121212),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              systemOverlayStyle: SystemUiOverlayStyle.light,
+            ),
           ),
           initialRoute: '/',
           routes: {

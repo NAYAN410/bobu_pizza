@@ -5,11 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants.dart';
 import '../../services/supabase_service.dart';
 import '../../models/pizza_model.dart';
-import '../../models/category_model.dart';
 import '../../models/banner_model.dart';
 import '../../services/cart_service.dart';
 import '../../services/location_service.dart';
 import '../main_screen.dart';
+import '../notification_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -25,12 +25,10 @@ class _HomeTabState extends State<HomeTab> {
   Timer? _bannerTimer;
 
   List<BannerModel> _banners = [];
-  List<CategoryModel> _categories = [];
   List<Pizza> _popularPizzas = [];
   Map<String, dynamic>? _lastDeliveredOrder;
   String _currentAddress = "Fetching location...";
-  bool _isLoading = true;
-  int _activeCategoryIndex = 0;
+  int _unreadNotifications = 0;
 
   // Search state
   List<Pizza> _searchResults = [];
@@ -44,7 +42,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadAllData() async {
-    _fetchLocation(); // Start fetching location in parallel
+    _fetchLocation();
+    _fetchNotificationCount();
     try {
       final results = await Future.wait([
         SupabaseService.getBanners(),
@@ -56,25 +55,28 @@ class _HomeTabState extends State<HomeTab> {
       if (mounted) {
         setState(() {
           _banners = (results[0] as List).map((e) => BannerModel.fromJson(e)).toList();
-          _categories = (results[1] as List).map((e) => CategoryModel.fromJson(e)).toList();
           _popularPizzas = (results[2] as List).map((e) => Pizza.fromJson(e)).toList();
           
-          final orders = results[3] as List<Map<String, dynamic>>;
+          final List<Map<String, dynamic>> orders = results[3] as List<Map<String, dynamic>>;
           _lastDeliveredOrder = orders.firstWhere(
             (o) => o['status'].toString().toLowerCase() == 'delivered',
             orElse: () => {},
           );
           if (_lastDeliveredOrder!.isEmpty) _lastDeliveredOrder = null;
-
-          _isLoading = false;
         });
         _startBannerTimer();
       }
     } catch (e) {
       debugPrint('Error loading home data: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    }
+  }
+
+  Future<void> _fetchNotificationCount() async {
+    final notifications = await SupabaseService.getNotifications();
+    if (mounted) {
+      setState(() {
+        _unreadNotifications = notifications.where((n) => n['is_read'] == false).length;
+      });
     }
   }
 
@@ -169,52 +171,58 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final sw = MediaQuery.of(context).size.width;
     final double contentWidth = sw.clamp(0.0, 500.0);
     final double scale = (contentWidth / 375).clamp(0.85, 1.15);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
-    return RefreshIndicator(
-      onRefresh: _loadAllData,
-      color: AppColors.primary,
-      child: Stack(
-        children: [
-          SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(scale, isDark),
-                _buildSearchBar(scale, isDark),
-                if (_banners.isNotEmpty) _buildBannerCarousel(scale, contentWidth),
-                
-                // ── Cafe Timing Indicator ──
-                _buildCafeTimingIndicator(scale, isDark),
-                
-                if (_lastDeliveredOrder != null) ...[
-                  _buildSectionHeaderWithAction('Recent Order', 'See all', scale, isDark, () {
-                    MainScreen.of(context)?.setIndex(3);
-                  }),
-                  _buildLastOrderCard(_lastDeliveredOrder!, scale, isDark),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark ? AppColors.bgGradientDark : AppColors.bgGradient,
+          stops: const [0.0, 0.55, 1.0],
+        ),
+      ),
+      child: RefreshIndicator(
+        onRefresh: _loadAllData,
+        color: AppColors.primary,
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(scale, isDark),
+                  _buildSearchBar(scale, isDark),
+                  if (_banners.isNotEmpty) _buildBannerCarousel(scale, contentWidth),
+                  
+                  _buildCafeTimingIndicator(scale, isDark),
+                  
+                  if (_lastDeliveredOrder != null) ...[
+                    _buildSectionHeaderWithAction('Recent Order', 'See all', scale, isDark, () {
+                      MainScreen.of(context)?.setIndex(3);
+                    }),
+                    _buildLastOrderCard(_lastDeliveredOrder!, scale, isDark),
+                  ],
+
+                  _buildSectionHeader('Popular Pizzas', scale, isDark),
+                  if (_popularPizzas.isNotEmpty) _buildVerticalPizzaList(scale, isDark),
+                  const SizedBox(height: 120),
                 ],
-
-                _buildSectionHeader('Popular Pizzas', scale, isDark),
-                if (_popularPizzas.isNotEmpty) _buildVerticalPizzaList(scale, isDark),
-                SizedBox(height: 120 * scale), // Space for floating nav bar
-              ],
+              ),
             ),
-          ),
-          
-          // Search Overlay
-          if (_searchController.text.isNotEmpty)
-            _buildSearchOverlay(scale, isDark),
-        ],
+            if (_searchController.text.isNotEmpty)
+              _buildSearchOverlay(scale, isDark),
+          ],
+        ),
       ),
     );
   }
-
-  // ─── Header ───────────────────────────────────────────────────────
 
   Widget _buildHeader(double scale, bool isDark) {
     return Padding(
@@ -249,40 +257,49 @@ class _HomeTabState extends State<HomeTab> {
                 ),
                 SizedBox(height: 8 * scale),
                 Text(_getGreeting(),
-                  style: GoogleFonts.poppins(fontSize: 13 * scale, color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(128), fontWeight: FontWeight.w500)),
+                  style: GoogleFonts.poppins(fontSize: 13 * scale, color: isDark ? Colors.white38 : Colors.black45, fontWeight: FontWeight.w500)),
                 SizedBox(height: 2 * scale),
                 Text('What\'s your craving?',
                   style: GoogleFonts.poppins(fontSize: 20 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
               ],
             ),
           ),
-          Stack(
-            children: [
-              Container(
-                padding: EdgeInsets.all(10 * scale),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withAlpha(13) : Colors.white, 
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
-                  boxShadow: isDark ? [] : [BoxShadow(color: const Color(0xFF2D1A0E).withAlpha(15), blurRadius: 10, offset: const Offset(0, 3))],
+          GestureDetector(
+            onTap: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen()));
+              _fetchNotificationCount();
+            },
+            child: Stack(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10 * scale),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.black.withOpacity(0.3) : Colors.white, 
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE8D5C0), width: 1.2),
+                    boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 3))],
+                  ),
+                  child: Icon(Icons.notifications_none_outlined, color: isDark ? Colors.white70 : const Color(0xFF2D1A0E), size: 22 * scale),
                 ),
-                child: Icon(Icons.notifications_none_outlined, color: isDark ? Colors.white70 : const Color(0xFF2D1A0E), size: 22 * scale),
-              ),
-              Positioned(
-                right: 9, top: 9,
-                child: Container(
-                  height: 9, width: 9,
-                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                ),
-              ),
-            ],
+                if (_unreadNotifications > 0)
+                  Positioned(
+                    right: 9, top: 9,
+                    child: Container(
+                      height: 10, width: 10,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary, 
+                        shape: BoxShape.circle,
+                        border: Border.all(color: isDark ? const Color(0xFF1A1A1A) : Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  // ─── Search bar ───────────────────────────────────────────────────
 
   Widget _buildSearchBar(double scale, bool isDark) {
     return Padding(
@@ -294,9 +311,9 @@ class _HomeTabState extends State<HomeTab> {
           child: Container(
             height: 54 * scale,
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withAlpha(13) : Colors.white.withAlpha(180), 
+              color: isDark ? Colors.black.withOpacity(0.35) : Colors.white.withOpacity(0.7), 
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
+              border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE8D5C0), width: 1.2),
             ),
             child: TextField(
               controller: _searchController,
@@ -327,7 +344,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildSearchOverlay(double scale, bool isDark) {
     return Positioned(
-      top: 130 * scale, // Adjust based on your header + search bar height
+      top: 130 * scale,
       left: 20 * scale,
       right: 20 * scale,
       bottom: 0,
@@ -337,8 +354,8 @@ class _HomeTabState extends State<HomeTab> {
           filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
           child: Container(
             decoration: BoxDecoration(
-              color: isDark ? Colors.black.withAlpha(200) : Colors.white.withAlpha(230),
-              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
+              color: isDark ? Colors.black.withOpacity(0.85) : Colors.white.withOpacity(0.95),
+              border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE8D5C0)),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: _isSearching 
@@ -360,7 +377,7 @@ class _HomeTabState extends State<HomeTab> {
                             },
                             leading: Container(
                               width: 50, height: 50,
-                              decoration: BoxDecoration(color: AppColors.primary.withAlpha(20), borderRadius: BorderRadius.circular(10)),
+                              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
                               child: Image.network(pizza.imageUrl, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png')),
                             ),
                             title: Text(pizza.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
@@ -375,8 +392,6 @@ class _HomeTabState extends State<HomeTab> {
       ),
     );
   }
-
-  // ─── Banner carousel ──────────────────────────────────────────────
 
   Widget _buildBannerCarousel(double scale, double contentWidth) {
     return Column(
@@ -400,7 +415,7 @@ class _HomeTabState extends State<HomeTab> {
               margin: EdgeInsets.symmetric(horizontal: 3 * scale),
               width: isActive ? 20 * scale : 6 * scale, height: 6 * scale,
               decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : AppColors.primary.withAlpha(64),
+                color: isActive ? AppColors.primary : AppColors.primary.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
             );
@@ -417,7 +432,7 @@ class _HomeTabState extends State<HomeTab> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(20),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 16,
             offset: const Offset(0, 8),
           )
@@ -445,7 +460,7 @@ class _HomeTabState extends State<HomeTab> {
     return Container(
       color: AppColors.primary,
       child: Center(
-        child: Icon(Icons.image_outlined, color: Colors.white.withAlpha(128), size: 50 * scale),
+        child: Icon(Icons.image_outlined, color: Colors.white.withOpacity(0.5), size: 50 * scale),
       ),
     );
   }
@@ -483,12 +498,12 @@ class _HomeTabState extends State<HomeTab> {
         margin: EdgeInsets.symmetric(horizontal: 20 * scale),
         padding: EdgeInsets.all(16 * scale),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withAlpha(13) : Colors.white,
+          color: isDark ? Colors.black.withOpacity(0.3) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0)),
+          border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE8D5C0)),
           boxShadow: isDark ? [] : [
             BoxShadow(
-              color: const Color(0xFF2D1A0E).withAlpha(10),
+              color: const Color(0xFF2D1A0E).withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -500,13 +515,17 @@ class _HomeTabState extends State<HomeTab> {
               width: 50 * scale,
               height: 50 * scale,
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withAlpha(10) : const Color(0xFFFFF0DC),
+                color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFFFF0DC),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: firstItem != null && firstItem['image_url'] != null
-                    ? Image.network(firstItem['image_url'], fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.local_pizza_outlined, color: AppColors.primary))
+                    ? Image.network(
+                        firstItem['image_url'], 
+                        fit: BoxFit.contain, 
+                        errorBuilder: (_, __, ___) => const Icon(Icons.local_pizza_outlined, color: AppColors.primary)
+                      )
                     : const Icon(Icons.local_pizza_outlined, color: AppColors.primary),
               ),
             ),
@@ -532,8 +551,6 @@ class _HomeTabState extends State<HomeTab> {
                 ],
               ),
             ),
-            
-            // Repeat Order Button
             ElevatedButton(
               onPressed: () async {
                 final List items = order['order_items'];
@@ -551,11 +568,11 @@ class _HomeTabState extends State<HomeTab> {
                 }
                 if (mounted) {
                   _showTopSnackBar(context, 'Order repeated! Items added to cart.');
-                  MainScreen.of(context)?.setIndex(2); // Go to Cart Tab
+                  MainScreen.of(context)?.setIndex(2); 
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary.withAlpha(26),
+                backgroundColor: AppColors.primary.withOpacity(0.15),
                 foregroundColor: AppColors.primary,
                 elevation: 0,
                 padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 8 * scale),
@@ -575,43 +592,6 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildCategories(double scale, bool isDark) {
-    return SizedBox(
-      height: 100 * scale,
-      child: ListView.builder(
-        padding: EdgeInsets.only(left: 20 * scale),
-        scrollDirection: Axis.horizontal,
-        itemCount: _categories.length,
-        itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final isActive = index == _activeCategoryIndex;
-          return GestureDetector(
-            onTap: () => setState(() => _activeCategoryIndex = index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic,
-              margin: EdgeInsets.only(right: 14 * scale),
-              padding: EdgeInsets.symmetric(horizontal: 18 * scale),
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : (isDark ? Colors.white.withAlpha(13) : Colors.white),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isActive ? AppColors.primary : (isDark ? Colors.white10 : const Color(0xFFE8D5C0)), width: 1.2),
-                boxShadow: isActive ? [BoxShadow(color: AppColors.primary.withAlpha(64), blurRadius: 10, offset: const Offset(0, 4))] : (isDark ? [] : [BoxShadow(color: const Color(0xFF2D1A0E).withAlpha(13), blurRadius: 10, offset: const Offset(0, 4))]),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(cat.icon, style: TextStyle(fontSize: 22 * scale)),
-                  SizedBox(width: 8 * scale),
-                  Text(cat.name, style: GoogleFonts.poppins(fontSize: 13 * scale, fontWeight: FontWeight.w600, color: isActive ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF2D1A0E)))),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildVerticalPizzaList(double scale, bool isDark) {
     return Column(
       children: _popularPizzas.map((pizza) {
@@ -620,12 +600,12 @@ class _HomeTabState extends State<HomeTab> {
           child: Container(
             margin: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 10 * scale),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withAlpha(13) : Colors.white,
+              color: isDark ? Colors.black.withOpacity(0.25) : Colors.white,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
+              border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE8D5C0), width: 1),
               boxShadow: isDark ? [] : [
                 BoxShadow(
-                  color: const Color(0xFF2D1A0E).withAlpha(20),
+                  color: const Color(0xFF2D1A0E).withOpacity(0.05),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -634,7 +614,6 @@ class _HomeTabState extends State<HomeTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top: Image + Tags
                 Stack(
                   children: [
                     ClipRRect(
@@ -643,7 +622,7 @@ class _HomeTabState extends State<HomeTab> {
                         width: double.infinity,
                         height: 180 * scale,
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withAlpha(5) : const Color(0xFFFFF0DC),
+                          color: isDark ? Colors.black.withOpacity(0.2) : const Color(0xFFFFF0DC),
                         ),
                         child: Hero(
                           tag: 'pizza_home_${pizza.id}',
@@ -652,7 +631,17 @@ class _HomeTabState extends State<HomeTab> {
                                   pizza.imageUrl,
                                   width: double.infinity,
                                   height: double.infinity,
-                                  fit: BoxFit.cover, // Poora fill karega
+                                  fit: BoxFit.cover,
+                                  cacheWidth: (MediaQuery.of(context).size.width * 1.5).toInt(),
+                                  frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                                    if (wasSynchronouslyLoaded) return child;
+                                    return AnimatedOpacity(
+                                      opacity: frame == null ? 0 : 1,
+                                      duration: const Duration(milliseconds: 500),
+                                      curve: Curves.easeOut,
+                                      child: child,
+                                    );
+                                  },
                                   errorBuilder: (context, error, stackTrace) => 
                                     Image.asset('assets/images/pizza.png', fit: BoxFit.cover),
                                 )
@@ -665,7 +654,6 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                       ),
                     ),
-                    // Discount Tag (Left)
                     if (pizza.discount > 0)
                       Positioned(
                         top: 15 * scale,
@@ -689,7 +677,6 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                         ),
                       ),
-                    // Bestseller Tag (Right)
                     if (pizza.category == 'Bestseller')
                       Positioned(
                         top: 15 * scale,
@@ -701,7 +688,7 @@ class _HomeTabState extends State<HomeTab> {
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withAlpha(76),
+                                color: AppColors.primary.withOpacity(0.3),
                                 blurRadius: 8,
                               )
                             ],
@@ -723,10 +710,30 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                         ),
                       ),
+                    if (pizza.tag.isNotEmpty)
+                      Positioned(
+                        bottom: 12 * scale,
+                        right: 12 * scale,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 5 * scale),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                          ),
+                          child: Text(
+                            pizza.tag.toUpperCase(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 9 * scale,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-
-                // Bottom: Content
                 Padding(
                   padding: EdgeInsets.all(20 * scale),
                   child: Column(
@@ -796,7 +803,7 @@ class _HomeTabState extends State<HomeTab> {
                         pizza.description,
                         style: GoogleFonts.poppins(
                           fontSize: 13 * scale,
-                          color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(128),
+                          color: isDark ? Colors.white38 : Colors.black54,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -813,7 +820,7 @@ class _HomeTabState extends State<HomeTab> {
                                   '₹${pizza.price.toInt()}',
                                   style: GoogleFonts.poppins(
                                     fontSize: 12 * scale,
-                                    color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withAlpha(76),
+                                    color: isDark ? Colors.white24 : Colors.black26,
                                     decoration: TextDecoration.lineThrough,
                                   ),
                                 ),
@@ -837,7 +844,7 @@ class _HomeTabState extends State<HomeTab> {
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 4,
-                          shadowColor: AppColors.primary.withAlpha(102),
+                          shadowColor: AppColors.primary.withOpacity(0.4),
                           padding: EdgeInsets.symmetric(horizontal: 24 * scale),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -868,7 +875,6 @@ class _HomeTabState extends State<HomeTab> {
   Widget _buildCafeTimingIndicator(double scale, bool isDark) {
     final now = DateTime.now();
     final currentHour = now.hour;
-    // Open from 12 PM (12) to 10 PM (22)
     final isOpen = currentHour >= 12 && currentHour < 22;
     
     return Padding(
@@ -880,9 +886,9 @@ class _HomeTabState extends State<HomeTab> {
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withAlpha(13) : Colors.white.withAlpha(150),
+              color: isDark ? Colors.black.withOpacity(0.3) : Colors.white.withOpacity(0.6),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1.2),
+              border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE8D5C0), width: 1.2),
             ),
             child: Row(
               children: [
@@ -894,7 +900,7 @@ class _HomeTabState extends State<HomeTab> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: (isOpen ? Colors.green : Colors.red).withAlpha(100),
+                        color: (isOpen ? Colors.green : Colors.red).withOpacity(0.4),
                         blurRadius: 6,
                         spreadRadius: 2,
                       )
@@ -929,7 +935,7 @@ class _HomeTabState extends State<HomeTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.red.withAlpha(26),
+                      color: Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -961,15 +967,24 @@ class _HomeTabState extends State<HomeTab> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Calculate price based on size and addons
             double currentUnitPrice = item.getPriceForSize(selectedSize ?? '');
             
             // Addon logic
-            final bool isSmall = selectedSize?.toLowerCase() == 'small';
+            final bool isBobu = item.category.toLowerCase().contains('bobu');
+            final String size = selectedSize?.toLowerCase() ?? 'small';
+
             for (var addon in selectedAddons) {
-              if (addon == 'Extra Cheese') currentUnitPrice += isSmall ? 20 : 30;
-              else if (addon == 'Paneer') currentUnitPrice += isSmall ? 30 : 50;
-              else if (addon == 'Veggie') currentUnitPrice += isSmall ? 20 : 30;
+              final a = addon.toLowerCase();
+              if (isBobu) {
+                if (a.contains('cheese')) currentUnitPrice += (size == 'small' ? 39 : (size == 'medium' ? 69 : 99));
+                else if (a.contains('veg topping')) currentUnitPrice += (size == 'small' ? 19 : (size == 'medium' ? 29 : 39));
+                else if (a.contains('paneer') || a.contains('olive')) currentUnitPrice += (size == 'small' ? 29 : (size == 'medium' ? 49 : 69));
+                else if (a.contains('jalapeno') || a.contains('paprika')) currentUnitPrice += (size == 'small' ? 29 : (size == 'medium' ? 49 : 69));
+              } else {
+                if (a.contains('cheese')) currentUnitPrice += (size == 'small' ? 20 : 30);
+                else if (a.contains('paneer')) currentUnitPrice += (size == 'small' ? 30 : 50);
+                else if (a.contains('veggie')) currentUnitPrice += (size == 'small' ? 20 : 30);
+              }
             }
 
             final double totalDisplayPrice = currentUnitPrice * quantity;
@@ -986,25 +1001,39 @@ class _HomeTabState extends State<HomeTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. Large Image Header
                         Container(
                           width: double.infinity,
                           height: 300 * scale,
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withAlpha(5) : const Color(0xFFFFF0DC),
+                            color: isDark ? Colors.black.withOpacity(0.2) : const Color(0xFFFFF0DC),
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                           ),
                           child: Stack(
                             children: [
-                              Center(
-                                child: Hero(
-                                  tag: 'pizza_details_home_${item.id}',
-                                  child: item.imageUrl.startsWith('http')
-                                      ? Image.network(item.imageUrl, height: 220 * scale, fit: BoxFit.contain)
-                                      : Image.asset('assets/images/pizza.png', height: 220 * scale, fit: BoxFit.contain),
+                              Positioned.fill(
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                                  child: Hero(
+                                    tag: 'pizza_details_home_${item.id}',
+                                    child: item.imageUrl.startsWith('http')
+                                        ? Image.network(
+                                            item.imageUrl, 
+                                            fit: BoxFit.cover,
+                                            cacheWidth: 1000,
+                                            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                                              if (wasSynchronouslyLoaded) return child;
+                                              return AnimatedOpacity(
+                                                opacity: frame == null ? 0 : 1,
+                                                duration: const Duration(milliseconds: 500),
+                                                curve: Curves.easeOut,
+                                                child: child,
+                                              );
+                                            },
+                                          )
+                                        : Image.asset('assets/images/pizza.png', fit: BoxFit.cover),
+                                  ),
                                 ),
                               ),
-                              // Close Button
                               Positioned(
                                 top: 20 * scale,
                                 right: 20 * scale,
@@ -1012,35 +1041,49 @@ class _HomeTabState extends State<HomeTab> {
                                   onTap: () => Navigator.pop(context),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(color: isDark ? Colors.white.withAlpha(26) : Colors.white, shape: BoxShape.circle),
-                                    child: Icon(Icons.close, color: isDark ? Colors.white : Colors.black, size: 20),
+                                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, color: Colors.white, size: 20),
                                   ),
                                 ),
                               ),
-                              // Bestseller & Discount tags
-                              if (item.category == 'Bestseller')
-                                Positioned(
-                                  top: 20 * scale,
-                                  left: 20 * scale,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Text('BESTSELLER', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
+                              Positioned(
+                                top: 20 * scale,
+                                left: 20 * scale,
+                                child: Row(
+                                  children: [
+                                    if (item.category == 'Bestseller')
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        margin: const EdgeInsets.only(right: 8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Text('BESTSELLER', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
+                                    if (item.tag.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber[800],
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          item.tag.toUpperCase(),
+                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                  ],
                                 ),
+                              ),
                             ],
                           ),
                         ),
-
                         Padding(
                           padding: EdgeInsets.all(24 * scale),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 2. Info Row (Veg icon + Name + Rating)
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1074,7 +1117,7 @@ class _HomeTabState extends State<HomeTab> {
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(color: Colors.amber.withAlpha(26), borderRadius: BorderRadius.circular(12)),
+                                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                                     child: Row(
                                       children: [
                                         const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
@@ -1085,10 +1128,7 @@ class _HomeTabState extends State<HomeTab> {
                                   ),
                                 ],
                               ),
-                              
                               SizedBox(height: 16 * scale),
-
-                              // ── Size Selection ──
                               if (item.sizes != null && item.sizes!.isNotEmpty) ...[
                                 Text('Select Size', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                 SizedBox(height: 12 * scale),
@@ -1102,7 +1142,7 @@ class _HomeTabState extends State<HomeTab> {
                                         margin: EdgeInsets.only(right: 12 * scale),
                                         padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 10 * scale),
                                         decoration: BoxDecoration(
-                                          color: isSelected ? AppColors.primary : (isDark ? Colors.white.withAlpha(13) : Colors.grey[100]),
+                                          color: isSelected ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]),
                                           borderRadius: BorderRadius.circular(12),
                                           border: Border.all(color: isSelected ? AppColors.primary : (isDark ? Colors.white10 : Colors.transparent)),
                                         ),
@@ -1120,18 +1160,27 @@ class _HomeTabState extends State<HomeTab> {
                                 ),
                                 SizedBox(height: 24 * scale),
                               ],
-
-                              // ── Add-ons Selection ──
                               if (item.category.contains('Pizza')) ...[
                                 Text('Add Extras', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                 SizedBox(height: 12 * scale),
-                                ...['Extra Cheese', 'Paneer', 'Veggie'].map((addon) {
+                                ...(isBobu 
+                                    ? ['Extra Cheese', 'Veg Toppings', 'Paneer/Olive', 'Jalapeno/Paprika'] 
+                                    : ['Extra Cheese', 'Paneer', 'Veggie']
+                                ).map((addon) {
                                   bool isSelected = selectedAddons.contains(addon);
                                   int price = 0;
-                                  bool isS = selectedSize?.toLowerCase() == 'small';
-                                  if (addon == 'Extra Cheese') price = isS ? 20 : 30;
-                                  else if (addon == 'Paneer') price = isS ? 30 : 50;
-                                  else if (addon == 'Veggie') price = isS ? 20 : 30;
+                                  final String sz = selectedSize?.toLowerCase() ?? 'small';
+                                  
+                                  if (isBobu) {
+                                    if (addon.contains('Cheese')) price = sz == 'small' ? 39 : (sz == 'medium' ? 69 : 99);
+                                    else if (addon.contains('Veg')) price = sz == 'small' ? 19 : (sz == 'medium' ? 29 : 39);
+                                    else if (addon.contains('Paneer')) price = sz == 'small' ? 29 : (sz == 'medium' ? 49 : 69);
+                                    else if (addon.contains('Jalapeno')) price = sz == 'small' ? 29 : (sz == 'medium' ? 49 : 69);
+                                  } else {
+                                    if (addon == 'Extra Cheese') price = sz == 'small' ? 20 : 30;
+                                    else if (addon == 'Paneer') price = sz == 'small' ? 30 : 50;
+                                    else if (addon == 'Veggie') price = sz == 'small' ? 20 : 30;
+                                  }
 
                                   return GestureDetector(
                                     onTap: () {
@@ -1144,7 +1193,7 @@ class _HomeTabState extends State<HomeTab> {
                                       margin: EdgeInsets.only(bottom: 10 * scale),
                                       padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
                                       decoration: BoxDecoration(
-                                        color: isSelected ? AppColors.primary.withAlpha(26) : (isDark ? Colors.white.withAlpha(13) : Colors.grey[50]),
+                                        color: isSelected ? AppColors.primary.withOpacity(0.1) : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50]),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(color: isSelected ? AppColors.primary : (isDark ? Colors.white10 : Colors.grey[200]!)),
                                       ),
@@ -1178,35 +1227,29 @@ class _HomeTabState extends State<HomeTab> {
                                       ),
                                     ),
                                   );
-                                }).toList(),
+                                }),
                                 SizedBox(height: 24 * scale),
                               ],
-
-                              // 3. Description
                               Text('Description', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                               SizedBox(height: 8 * scale),
                               Text(item.description, style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white60 : AppColors.textGrey, height: 1.5)),
-                              
-                              SizedBox(height: 100 * scale), // Space for bottom bar
+                              SizedBox(height: 100 * scale),
                             ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  
-                  // 5. Fixed Bottom Pricing Bar
                   Positioned(
                     bottom: 0, left: 0, right: 0,
                     child: Container(
                       padding: EdgeInsets.all(24 * scale),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                        boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 20, offset: const Offset(0, -5))],
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
                       ),
                       child: Row(
                         children: [
-                          // Price info
                           Expanded(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -1219,7 +1262,6 @@ class _HomeTabState extends State<HomeTab> {
                               ],
                             ),
                           ),
-                          // Quantity Counter
                           Container(
                             decoration: BoxDecoration(border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!), borderRadius: BorderRadius.circular(12)),
                             child: Row(
@@ -1231,7 +1273,6 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                           ),
                           SizedBox(width: 16 * scale),
-                          // Add Button
                           ElevatedButton(
                             onPressed: () {
                               CartService.addToCart(item, quantity: quantity, size: selectedSize, addons: selectedAddons);
@@ -1239,8 +1280,10 @@ class _HomeTabState extends State<HomeTab> {
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
-                              padding: EdgeInsets.symmetric(horizontal: 24 * scale, vertical: 16 * scale),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 24 * scale, vertical: 12 * scale),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
                             ),
                             child: const Text('Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
@@ -1254,42 +1297,6 @@ class _HomeTabState extends State<HomeTab> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildWhyUs(double scale, bool isDark) {
-    final perks = [
-      {'icon': '🚀', 'title': 'Fast Delivery', 'sub': 'Under 30 minutes'},
-      {'icon': '🍕', 'title': 'Fresh Dough', 'sub': 'Made daily'},
-      {'icon': '💰', 'title': 'Best Price', 'sub': 'No hidden fees'},
-    ];
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20 * scale),
-      child: Row(
-        children: perks.map((p) {
-          return Expanded(
-            child: Container(
-              margin: EdgeInsets.only(right: p != perks.last ? 10 * scale : 0),
-              padding: EdgeInsets.symmetric(vertical: 14 * scale, horizontal: 8 * scale),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withAlpha(13) : Colors.white, 
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
-                boxShadow: isDark ? [] : [BoxShadow(color: const Color(0xFF2D1A0E).withAlpha(13), blurRadius: 10, offset: const Offset(0, 3))],
-              ),
-              child: Column(
-                children: [
-                  Text(p['icon']!, style: TextStyle(fontSize: 24 * scale)),
-                  SizedBox(height: 6 * scale),
-                  Text(p['title']!, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF2D1A0E))),
-                  SizedBox(height: 2 * scale),
-                  Text(p['sub']!, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 9 * scale, color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(115))),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
     );
   }
 }
@@ -1326,7 +1333,6 @@ class _TopSnackBarWidgetState extends State<_TopSnackBarWidget> with SingleTicke
 
     _controller.forward();
 
-    // Auto dismiss after 3 seconds
     Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
         await _controller.reverse();
@@ -1366,16 +1372,16 @@ class _TopSnackBarWidgetState extends State<_TopSnackBarWidget> with SingleTicke
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       decoration: BoxDecoration(
                         color: isDark 
-                          ? Colors.white.withAlpha(20) 
-                          : AppColors.primary.withAlpha(25),
+                          ? Colors.black.withOpacity(0.3) 
+                          : AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isDark ? Colors.white.withAlpha(30) : AppColors.primary.withAlpha(60),
+                          color: isDark ? Colors.white.withOpacity(0.1) : AppColors.primary.withOpacity(0.2),
                           width: 1.2,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha(isDark ? 60 : 20),
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
                             blurRadius: 15,
                             offset: const Offset(0, 8),
                           ),
@@ -1386,7 +1392,7 @@ class _TopSnackBarWidgetState extends State<_TopSnackBarWidget> with SingleTicke
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withAlpha(40),
+                              color: AppColors.primary.withOpacity(0.15),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),

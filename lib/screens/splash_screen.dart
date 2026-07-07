@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants.dart';
@@ -51,12 +49,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _setupSystemUI() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light, 
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ));
   }
 
   void _initControllers() {
@@ -137,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen>
         throw Exception('Keys missing');
       }
 
-      await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+      await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
       _dotController.animateTo(0.5, curve: Curves.easeInOut);
 
       // 3. Now initialize Notification Service safely
@@ -382,62 +374,65 @@ class _SplashScreenState extends State<SplashScreen>
     final double scale = _getScale(sw);
     final double pizzaSize = contentWidth * 1.35;
     final double pizzaVisibleHeight = pizzaSize * 0.30;
-    final isDark = ThemeService().isDarkMode;
+    
+    // Using MediaQuery for the most accurate startup brightness detection
+    final brightness = MediaQuery.of(context).platformBrightness;
+    final bool isDark = brightness == Brightness.dark;
 
     return Scaffold(
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark ? AppColors.bgGradientDark : AppColors.bgGradient,
-            stops: const [0.0, 0.55, 1.0],
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark ? AppColors.bgGradientDark : AppColors.bgGradient,
+              stops: const [0.0, 0.55, 1.0],
+            ),
           ),
-        ),
-        child: ClipRect(
-          child: Center(
-            child: SizedBox(
-              width: contentWidth,
-              height: sh,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  Positioned(
-                    top: -30 * scale,
-                    left: -contentWidth * 0.15,
-                    child: FadeTransition(
-                      opacity: _logoFade,
-                      child: Hero(
-                        tag: 'sauce_splash',
-                        child: Image.asset(
-                          'assets/images/splash.png',
-                          width: contentWidth * 1.4,
-                          fit: BoxFit.contain,
+          child: ClipRect(
+            child: Center(
+              child: SizedBox(
+                width: contentWidth,
+                height: sh,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned(
+                      top: -30 * scale,
+                      left: -contentWidth * 0.15,
+                      child: FadeTransition(
+                        opacity: _logoFade,
+                        child: Hero(
+                          tag: 'sauce_splash',
+                          child: Image.asset(
+                            'assets/images/splash.png',
+                            width: contentWidth * 1.4,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    top: (sh / 2) - (pizzaVisibleHeight / 2) - (160 * scale),
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: _buildLogo(scale),
+                    Positioned(
+                      top: (sh / 2) - (pizzaVisibleHeight / 2) - (160 * scale),
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: _buildLogo(scale),
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    bottom: -(pizzaSize / 2) + pizzaVisibleHeight,
-                    left: -(pizzaSize - contentWidth) / 2,
-                    child: _buildPizza(contentWidth),
-                  ),
-                ],
+                    Positioned(
+                      bottom: -(pizzaSize / 2) + pizzaVisibleHeight,
+                      left: -(pizzaSize - contentWidth) / 2,
+                      child: _buildPizza(contentWidth),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
       ),
     );
   }

@@ -379,7 +379,17 @@ class _MenuTabState extends State<MenuTab> {
       physics: const BouncingScrollPhysics(),
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
-        return _buildCompactMenuCard(_searchResults[index], scale, isDark);
+        final item = _searchResults[index];
+        return GestureDetector(
+          onTap: () {
+            if (item.category == 'BOBU Deals') {
+              _showDealDetails(context, item, scale, isDark);
+            } else {
+              _showPizzaDetails(context, item, scale, isDark);
+            }
+          },
+          child: _buildCompactMenuCard(item, scale, isDark),
+        );
       },
     );
   }
@@ -409,7 +419,13 @@ class _MenuTabState extends State<MenuTab> {
           }
           final item = _allItems[index];
           return GestureDetector(
-            onTap: () => _showPizzaDetails(context, item, scale, isDark),
+            onTap: () {
+              if (item.category == 'BOBU Deals') {
+                _showDealDetails(context, item, scale, isDark);
+              } else {
+                _showPizzaDetails(context, item, scale, isDark);
+              }
+            },
             child: _buildCompactMenuCard(item, scale, isDark),
           );
         },
@@ -564,14 +580,12 @@ class _MenuTabState extends State<MenuTab> {
   Widget _buildCompactMenuCard(Pizza item, double scale, bool isDark) {
     return Container(
       margin: EdgeInsets.only(bottom: 16 * scale),
-      padding: EdgeInsets.all(12 * scale),
+      padding: EdgeInsets.all(10 * scale), // Reduced padding
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!, width: 1),
-        boxShadow: isDark
-            ? []
-            : [
+        boxShadow: isDark ? [] : [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
@@ -585,19 +599,33 @@ class _MenuTabState extends State<MenuTab> {
           Stack(
             children: [
               Container(
-                width: 90 * scale,
-                height: 90 * scale,
+                width: 85 * scale, // Optimized width
+                height: 85 * scale, // Optimized height
                 decoration: BoxDecoration(
                   color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Hero(
-                  tag: 'pizza_${item.id}',
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Hero(
+                    tag: 'pizza_${item.id}',
                     child: item.imageUrl.startsWith('http')
-                        ? Image.network(item.imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png'))
-                        : Image.asset('assets/images/pizza.png', fit: BoxFit.contain),
+                        ? Image.network(
+                            item.imageUrl, 
+                            fit: BoxFit.cover,
+                            cacheWidth: 200,
+                            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                              if (wasSynchronouslyLoaded) return child;
+                              return AnimatedOpacity(
+                                opacity: frame == null ? 0 : 1,
+                                duration: const Duration(milliseconds: 500),
+                                curve: Curves.easeOut,
+                                child: child,
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png', fit: BoxFit.cover)
+                          )
+                        : Image.asset('assets/images/pizza.png', fit: BoxFit.cover),
                   ),
                 ),
               ),
@@ -614,12 +642,36 @@ class _MenuTabState extends State<MenuTab> {
                     child: Text('${item.discount}%', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                   ),
                 ),
+              if (item.tag != null && item.tag.isNotEmpty)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomRight: Radius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      item.tag.toUpperCase(),
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 7 * scale,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
-          SizedBox(width: 12 * scale),
+          SizedBox(width: 10 * scale),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Row(
                   children: [
@@ -639,9 +691,9 @@ class _MenuTabState extends State<MenuTab> {
                       ),
                     ),
                     if (item.category == 'Bestseller') ...[
-                      SizedBox(width: 6 * scale),
-                      const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                      Text(' Bestseller', style: GoogleFonts.poppins(fontSize: 9, color: Colors.amber[800], fontWeight: FontWeight.bold)),
+                      SizedBox(width: 4 * scale),
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 12),
+                      Text(' Bestseller', style: GoogleFonts.poppins(fontSize: 8, color: Colors.amber[800], fontWeight: FontWeight.bold)),
                     ],
                   ],
                 ),
@@ -649,47 +701,64 @@ class _MenuTabState extends State<MenuTab> {
                 Text(
                   item.name,
                   style: GoogleFonts.poppins(
-                    fontSize: 14 * scale,
+                    fontSize: 13 * scale,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                   ),
-                  maxLines: 2,
+                  maxLines: 1, // Changed to 1 line to save vertical space
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 2 * scale),
                 Text(
                   item.description,
                   style: GoogleFonts.poppins(
-                    fontSize: 10 * scale,
+                    fontSize: 9 * scale,
                     color: isDark ? Colors.white38 : Colors.grey[600],
                   ),
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: 8 * scale),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (item.discount > 0)
-                          Text('₹${item.price.toInt()}', style: TextStyle(fontSize: 10, color: Colors.grey, decoration: TextDecoration.lineThrough)),
-                        Text('₹${item.discountedPrice.toInt()}', style: GoogleFonts.poppins(fontSize: 15 * scale, fontWeight: FontWeight.w800, color: AppColors.primary)),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (item.discount > 0)
+                            Text('₹${item.price.toInt()}', 
+                              style: TextStyle(fontSize: 9 * scale, color: Colors.grey, decoration: TextDecoration.lineThrough)
+                            ),
+                          Text('₹${item.discountedPrice.toInt()}', 
+                            style: GoogleFonts.poppins(
+                              fontSize: 14 * scale, 
+                              fontWeight: FontWeight.w800, 
+                              color: AppColors.primary
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     SizedBox(
-                      height: 32 * scale,
+                      height: 28 * scale,
                       child: ElevatedButton(
-                        onPressed: () => CartService.addToCart(item),
+                        onPressed: () {
+                          if (item.category == 'BOBU Deals') {
+                            _showDealDetails(context, item, scale, isDark);
+                          } else {
+                            CartService.addToCart(item);
+                          }
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: EdgeInsets.symmetric(horizontal: 8 * scale),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                         ),
-                        child: Text('ADD', style: GoogleFonts.poppins(fontSize: 11 * scale, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          item.category == 'BOBU Deals' ? 'SELECT' : 'ADD', 
+                          style: GoogleFonts.poppins(fontSize: 10 * scale, fontWeight: FontWeight.bold)
+                        ),
                       ),
                     ),
                   ],
@@ -718,11 +787,21 @@ class _MenuTabState extends State<MenuTab> {
             double currentUnitPrice = item.getPriceForSize(selectedSize ?? '');
             
             // Addon logic
-            final bool isSmall = selectedSize?.toLowerCase() == 'small';
+            final bool isBobu = item.category.toLowerCase().contains('bobu');
+            final String size = selectedSize?.toLowerCase() ?? 'small';
+
             for (var addon in selectedAddons) {
-              if (addon == 'Extra Cheese') currentUnitPrice += isSmall ? 20 : 30;
-              else if (addon == 'Paneer') currentUnitPrice += isSmall ? 30 : 50;
-              else if (addon == 'Veggie') currentUnitPrice += isSmall ? 20 : 30;
+              final a = addon.toLowerCase();
+              if (isBobu) {
+                if (a.contains('cheese')) currentUnitPrice += (size == 'small' ? 39 : (size == 'medium' ? 69 : 99));
+                else if (a.contains('veg topping')) currentUnitPrice += (size == 'small' ? 19 : (size == 'medium' ? 29 : 39));
+                else if (a.contains('paneer') || a.contains('olive')) currentUnitPrice += (size == 'small' ? 29 : (size == 'medium' ? 49 : 69));
+                else if (a.contains('jalapeno') || a.contains('paprika')) currentUnitPrice += (size == 'small' ? 29 : (size == 'medium' ? 49 : 69));
+              } else {
+                if (a.contains('cheese')) currentUnitPrice += (size == 'small' ? 20 : 30);
+                else if (a.contains('paneer')) currentUnitPrice += (size == 'small' ? 30 : 50);
+                else if (a.contains('veggie')) currentUnitPrice += (size == 'small' ? 20 : 30);
+              }
             }
 
             final double totalDisplayPrice = currentUnitPrice * quantity;
@@ -748,14 +827,32 @@ class _MenuTabState extends State<MenuTab> {
                           ),
                           child: Stack(
                             children: [
-                              Center(
-                                child: Hero(
-                                  tag: 'pizza_details_${item.id}',
-                                  child: item.imageUrl.startsWith('http')
-                                      ? Image.network(item.imageUrl, height: 220 * scale, fit: BoxFit.contain)
-                                      : Image.asset('assets/images/pizza.png', height: 220 * scale, fit: BoxFit.contain),
+                              // Full Image with Cover fit
+                              Positioned.fill(
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                                  child: Hero(
+                                    tag: 'pizza_details_${item.id}',
+                                    child: item.imageUrl.startsWith('http')
+                                        ? Image.network(
+                                            item.imageUrl, 
+                                            fit: BoxFit.cover,
+                                            cacheWidth: 1000,
+                                            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                                              if (wasSynchronouslyLoaded) return child;
+                                              return AnimatedOpacity(
+                                                opacity: frame == null ? 0 : 1,
+                                                duration: const Duration(milliseconds: 500),
+                                                curve: Curves.easeOut,
+                                                child: child,
+                                              );
+                                            },
+                                          )
+                                        : Image.asset('assets/images/pizza.png', fit: BoxFit.cover),
+                                  ),
                                 ),
                               ),
+                              // Close Button
                               Positioned(
                                 top: 20 * scale,
                                 right: 20 * scale,
@@ -763,24 +860,42 @@ class _MenuTabState extends State<MenuTab> {
                                   onTap: () => Navigator.pop(context),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.1) : Colors.white, shape: BoxShape.circle),
-                                    child: Icon(Icons.close, color: isDark ? Colors.white : Colors.black, size: 20),
+                                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, color: Colors.white, size: 20),
                                   ),
                                 ),
                               ),
-                              if (item.category == 'Bestseller')
-                                Positioned(
-                                  top: 20 * scale,
-                                  left: 20 * scale,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Text('BESTSELLER', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
+                              // Tags Container
+                              Positioned(
+                                top: 20 * scale,
+                                left: 20 * scale,
+                                child: Row(
+                                  children: [
+                                    if (item.category == 'Bestseller')
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        margin: const EdgeInsets.only(right: 8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Text('BESTSELLER', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
+                                    if (item.tag != null && item.tag.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber[800],
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          item.tag.toUpperCase(),
+                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                  ],
                                 ),
+                              ),
                             ],
                           ),
                         ),
@@ -874,13 +989,24 @@ class _MenuTabState extends State<MenuTab> {
                               if (item.category.contains('Pizza')) ...[
                                 Text('Add Extras', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                 SizedBox(height: 12 * scale),
-                                ...['Extra Cheese', 'Paneer', 'Veggie'].map((addon) {
+                                ...(isBobu 
+                                    ? ['Extra Cheese', 'Veg Toppings', 'Paneer/Olive', 'Jalapeno/Paprika'] 
+                                    : ['Extra Cheese', 'Paneer', 'Veggie']
+                                ).map((addon) {
                                   bool isSelected = selectedAddons.contains(addon);
                                   int price = 0;
-                                  bool isS = selectedSize?.toLowerCase() == 'small';
-                                  if (addon == 'Extra Cheese') price = isS ? 20 : 30;
-                                  else if (addon == 'Paneer') price = isS ? 30 : 50;
-                                  else if (addon == 'Veggie') price = isS ? 20 : 30;
+                                  final String sz = selectedSize?.toLowerCase() ?? 'small';
+                                  
+                                  if (isBobu) {
+                                    if (addon.contains('Cheese')) price = sz == 'small' ? 39 : (sz == 'medium' ? 69 : 99);
+                                    else if (addon.contains('Veg')) price = sz == 'small' ? 19 : (sz == 'medium' ? 29 : 39);
+                                    else if (addon.contains('Paneer')) price = sz == 'small' ? 29 : (sz == 'medium' ? 49 : 69);
+                                    else if (addon.contains('Jalapeno')) price = sz == 'small' ? 29 : (sz == 'medium' ? 49 : 69);
+                                  } else {
+                                    if (addon == 'Extra Cheese') price = sz == 'small' ? 20 : 30;
+                                    else if (addon == 'Paneer') price = sz == 'small' ? 30 : 50;
+                                    else if (addon == 'Veggie') price = sz == 'small' ? 20 : 30;
+                                  }
 
                                   return GestureDetector(
                                     onTap: () {
@@ -983,8 +1109,10 @@ class _MenuTabState extends State<MenuTab> {
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
-                              padding: EdgeInsets.symmetric(horizontal: 24 * scale, vertical: 16 * scale),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 24 * scale, vertical: 12 * scale),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
                             ),
                             child: const Text('Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
@@ -998,6 +1126,273 @@ class _MenuTabState extends State<MenuTab> {
           },
         );
       },
+    );
+  }
+
+  void _showDealDetails(BuildContext context, Pizza dealItem, double scale, bool isDark) {
+    List<Pizza> selectedPizzas = [];
+    List<Pizza> premiumPizzas = [];
+    bool isLoading = true;
+
+    String targetSize = dealItem.name.toLowerCase().contains('small') ? 'Small' : 'Medium';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (isLoading && premiumPizzas.isEmpty) {
+              SupabaseService.getPizzas(tag: 'Premium Pizza', to: 50).then((data) {
+                if (context.mounted) {
+                  setModalState(() {
+                    premiumPizzas = data.map((e) => Pizza.fromJson(e)).toList();
+                    isLoading = false;
+                  });
+                }
+              });
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24 * scale, 24 * scale, 16 * scale, 16 * scale),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(dealItem.name, 
+                                style: GoogleFonts.poppins(fontSize: 20 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)
+                              ),
+                              Text('Select any 2 Premium Pizzas ($targetSize)', 
+                                style: GoogleFonts.poppins(fontSize: 12 * scale, color: AppColors.primary, fontWeight: FontWeight.w600)
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24 * scale, 10 * scale, 24 * scale, 0),
+                    child: Row(
+                      children: [
+                        _buildSelectionBox(selectedPizzas.isNotEmpty ? selectedPizzas[0] : null, scale, isDark, onRemove: () {
+                          setModalState(() => selectedPizzas.removeAt(0));
+                        }),
+                        SizedBox(width: 12 * scale),
+                        _buildSelectionBox(selectedPizzas.length > 1 ? selectedPizzas[1] : null, scale, isDark, onRemove: () {
+                          setModalState(() => selectedPizzas.removeAt(1));
+                        }),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 20 * scale),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24 * scale),
+                    child: Text('Premium Pizzas', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                  ),
+
+                  Expanded(
+                    child: isLoading 
+                      ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                      : ListView.builder(
+                          padding: EdgeInsets.all(20 * scale),
+                          itemCount: premiumPizzas.length,
+                          itemBuilder: (context, index) {
+                            final pizza = premiumPizzas[index];
+                            final count = selectedPizzas.where((p) => p.id == pizza.id).length;
+                            
+                            return GestureDetector(
+                              onTap: () {
+                                if (selectedPizzas.length < 2) {
+                                  setModalState(() => selectedPizzas.add(pizza));
+                                }
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                margin: EdgeInsets.only(bottom: 12 * scale),
+                                padding: EdgeInsets.all(12 * scale),
+                                decoration: BoxDecoration(
+                                  color: count > 0 
+                                    ? AppColors.primary.withOpacity(0.08) 
+                                    : (isDark ? Colors.white.withOpacity(0.03) : Colors.grey[50]),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: count > 0 ? AppColors.primary : (isDark ? Colors.white10 : Colors.grey[200]!),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.network(
+                                        pizza.imageUrl, 
+                                        width: 50 * scale, height: 50 * scale, 
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Image.asset('assets/images/pizza.png', width: 50, height: 50),
+                                      ),
+                                    ),
+                                    SizedBox(width: 14 * scale),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(pizza.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                                          Text(pizza.isVeg ? 'Veg' : 'Non-Veg', style: GoogleFonts.poppins(fontSize: 11, color: pizza.isVeg ? Colors.green : Colors.red, fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ),
+                                    if (count > 0)
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                                        child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                      )
+                                    else
+                                      const Icon(Icons.add_circle_outline_rounded, color: Colors.grey),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                  ),
+
+                  Container(
+                    padding: EdgeInsets.all(24 * scale),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Deal Price', style: GoogleFonts.poppins(fontSize: 12 * scale, color: Colors.grey)),
+                              Text('₹${dealItem.discountedPrice.toInt()}', style: GoogleFonts.poppins(fontSize: 24 * scale, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 160 * scale,
+                          height: 54 * scale,
+                          child: ElevatedButton(
+                            onPressed: selectedPizzas.length == 2 ? () {
+                              final List<String> addons = selectedPizzas.map((p) => p.name).toList();
+                              CartService.addToCart(
+                                dealItem, 
+                                quantity: 1, 
+                                size: targetSize, 
+                                addons: addons
+                              );
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Deal added to cart!'),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                )
+                              );
+                            } : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: isDark ? Colors.white10 : Colors.grey[300],
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
+                            ),
+                            child: Text('Add Deal', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16 * scale)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSelectionBox(Pizza? pizza, double scale, bool isDark, {VoidCallback? onRemove}) {
+    return Expanded(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            height: 60 * scale,
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: pizza != null ? AppColors.primary : (isDark ? Colors.white10 : Colors.grey[200]!)),
+            ),
+            child: pizza != null
+              ? Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(pizza.imageUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_,__,___)=>Image.asset('assets/images/pizza.png')),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(pizza.name, 
+                        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                        maxLines: 2, overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                )
+              : Center(
+                  child: Text('Select Pizza', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
+                ),
+          ),
+          if (pizza != null)
+            Positioned(
+              top: -8, right: -8,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red, 
+                    shape: BoxShape.circle,
+                    border: Border.all(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))
+                    ]
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 10),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

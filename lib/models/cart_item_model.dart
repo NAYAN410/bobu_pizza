@@ -19,17 +19,41 @@ class CartItem {
       base = pizza.getPriceForSize(selectedSize!);
     }
     
-    // Add-on pricing based on size
     double addonsTotal = 0;
-    final isSmall = selectedSize?.toLowerCase() == 'small';
-    
+    final size = selectedSize?.toLowerCase() ?? 'small';
+    final isBobu = pizza.category.toLowerCase().contains('bobu');
+
     for (var addon in selectedAddons) {
-      if (addon == 'Extra Cheese') {
-        addonsTotal += isSmall ? 20 : 30;
-      } else if (addon == 'Paneer') {
-        addonsTotal += isSmall ? 30 : 50;
-      } else if (addon == 'Veggie') {
-        addonsTotal += isSmall ? 20 : 30;
+      final a = addon.toLowerCase();
+      
+      if (isBobu) {
+        // BOBU Pizza Category Pricing
+        if (a.contains('cheese')) {
+          if (size == 'small') addonsTotal += 39;
+          else if (size == 'medium') addonsTotal += 69;
+          else addonsTotal += 99;
+        } else if (a.contains('veg topping')) {
+          if (size == 'small') addonsTotal += 19;
+          else if (size == 'medium') addonsTotal += 29;
+          else addonsTotal += 39;
+        } else if (a.contains('paneer') || a.contains('olive')) {
+          if (size == 'small') addonsTotal += 29;
+          else if (size == 'medium') addonsTotal += 49;
+          else addonsTotal += 69;
+        } else if (a.contains('jalapeno') || a.contains('paprika')) {
+          if (size == 'small') addonsTotal += 29;
+          else if (size == 'medium') addonsTotal += 49;
+          else addonsTotal += 69;
+        }
+      } else {
+        // Default / Pizza Mania Category Pricing
+        if (a.contains('cheese')) {
+          addonsTotal += (size == 'small') ? 20 : 30;
+        } else if (a.contains('paneer')) {
+          addonsTotal += (size == 'small') ? 30 : 50;
+        } else if (a.contains('veggie') || a.contains('veg topping')) {
+          addonsTotal += (size == 'small') ? 20 : 30;
+        }
       }
     }
     

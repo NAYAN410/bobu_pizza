@@ -175,7 +175,9 @@ class _CartTabState extends State<CartTab> {
                 ),
                 if (item.selectedSize != null || item.selectedAddons.isNotEmpty)
                   Text(
-                    '${item.selectedSize ?? ""}${item.selectedAddons.isNotEmpty ? " • +${item.selectedAddons.join(", ")}" : ""}',
+                    pizza.category == 'BOBU Deals'
+                        ? 'Includes: ${item.selectedAddons.join(" & ")}'
+                        : '${item.selectedSize ?? ""}${item.selectedAddons.isNotEmpty ? " • +${item.selectedAddons.join(", ")}" : ""}',
                     style: GoogleFonts.poppins(
                       fontSize: 10 * scale,
                       color: isDark ? Colors.white38 : Colors.grey,
