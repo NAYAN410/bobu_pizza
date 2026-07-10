@@ -24,12 +24,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Essential initializations that MUST happen before anything else
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e) {
-    debugPrint('Firebase Init Error: $e');
+    debugPrint('Initialization Error: $e');
   }
 
   runApp(const MyApp());

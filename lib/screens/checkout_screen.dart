@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../core/constants.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
 import '../models/address_model.dart';
 import '../services/notification_service.dart';
+import '../services/payment_service.dart';
 import 'order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -27,16 +30,51 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double _discountAmount = 0.0;
   bool _isValidatingCoupon = false;
 
+  late PaymentService _paymentService;
+
   @override
   void initState() {
     super.initState();
     _fetchAddresses();
+    _initPaymentService();
+  }
+
+  void _initPaymentService() {
+    _paymentService = PaymentService(
+      onPaymentSuccess: _handlePaymentSuccess,
+      onPaymentError: _handlePaymentError,
+      onExternalWallet: _handleExternalWallet,
+    );
   }
 
   @override
   void dispose() {
     _couponController.dispose();
+    _paymentService.dispose();
     super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    debugPrint('Payment Success: ${response.paymentId}');
+    _placeFinalOrder(
+      razorpayPaymentId: response.paymentId,
+      paymentStatus: 'completed',
+    );
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    debugPrint('Payment Error: ${response.code} - ${response.message}');
+    setState(() => _isPlacingOrder = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment Failed: ${response.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    debugPrint('External Wallet: ${response.walletName}');
   }
 
   Future<void> _fetchAddresses() async {
@@ -80,7 +118,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      // Check min purchase
       final minPurchase = (coupon['min_purchase'] ?? 0).toDouble();
       if (CartService.subtotal < minPurchase) {
         if (mounted) {
@@ -96,7 +133,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      // Calculate discount
       double discount = 0.0;
       final value = (coupon['discount_value'] ?? 0).toDouble();
       if (coupon['discount_type'] == 'percentage') {
@@ -134,7 +170,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  Future<void> _placeOrder() async {
+  Future<void> _initiatePlaceOrder() async {
     if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery address'), backgroundColor: Colors.orange),
@@ -142,6 +178,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
+    if (_paymentMode == 'Online') {
+      setState(() => _isPlacingOrder = true);
+      final finalTotal = CartService.subtotal - _discountAmount;
+      final user = supabase.Supabase.instance.client.auth.currentUser;
+      
+      _paymentService.openCheckout(
+        amount: finalTotal,
+        contact: _selectedAddress!.phoneNumber,
+        email: user?.email ?? '',
+        description: 'Payment for Order at Bobu Pizza',
+      );
+    } else {
+      _placeFinalOrder();
+    }
+  }
+
+  Future<void> _placeFinalOrder({String? razorpayPaymentId, String? paymentStatus}) async {
     setState(() => _isPlacingOrder = true);
     
     try {
@@ -163,6 +216,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         totalAmount: totalAfterDiscount,
         items: orderItems,
         couponId: _appliedCoupon?['id'],
+        razorpayPaymentId: razorpayPaymentId,
+        paymentStatus: paymentStatus,
       );
 
       if (mounted) {
@@ -170,7 +225,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (!mounted) return;
         setState(() => _isPlacingOrder = false);
         
-        // Add items to result map to show on success screen
         final orderDataForSuccess = {
           ...result,
           'items': cartItems.map((e) => {
@@ -183,7 +237,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }).toList(),
         };
 
-        // Show local notification
         NotificationService.showNotification(
           title: 'Order Placed! 🍕',
           body: 'Your order #${result['id']} has been placed successfully.',
@@ -329,7 +382,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _buildSectionTitle('Payment Mode', scale, isDark),
             _buildPaymentOption('COD', 'Cash on Delivery', Icons.money_rounded, scale, isDark, theme),
             const SizedBox(height: 12),
-            _buildPaymentOption('Online', 'Pay Online', Icons.payment_rounded, scale, isDark, theme),
+            _buildPaymentOption('Online', 'Pay Online (UPI, Cards)', Icons.payment_rounded, scale, isDark, theme),
             
             SizedBox(height: 32 * scale),
 
@@ -371,7 +424,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         height: 54,
                         width: 150 * scale,
                         child: ElevatedButton(
-                          onPressed: _isPlacingOrder ? null : _placeOrder,
+                          onPressed: _isPlacingOrder ? null : _initiatePlaceOrder,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,

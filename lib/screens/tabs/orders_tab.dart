@@ -231,7 +231,7 @@ class _OrdersTabState extends State<OrdersTab> with SingleTickerProviderStateMix
                             if (item['selected_addons'] != null && (item['selected_addons'] as List).isNotEmpty)
                               Text(
                                 '+ ${(item['selected_addons'] as List).join(", ")}',
-                                style: GoogleFonts.poppins(fontSize: 10, color: AppColors.primary.withOpacity(0.7)),
+                                style: GoogleFonts.poppins(fontSize: 10, color: AppColors.primary.withAlpha(179)),
                               ),
                           ],
                         ),

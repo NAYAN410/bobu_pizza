@@ -5,6 +5,7 @@ import '../../core/constants.dart';
 import '../../services/supabase_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/theme_service.dart';
+import '../notification_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -35,7 +36,6 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Future<void> _signOut(BuildContext context) async {
     await Supabase.instance.client.auth.signOut();
-    // Clear local cart memory so next user starts fresh
     CartService.clearLocalCart();
     if (context.mounted) {
       Navigator.pushReplacementNamed(context, '/login');
@@ -113,8 +113,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     final user = Supabase.instance.client.auth.currentUser;
     final String email = user?.email ?? 'guest@bobupizza.com';
-    final String name = _profileData?['full_name'] ?? user?.userMetadata?['full_name'] ??
-        email.split('@').first;
+    final String name = _profileData?['full_name'] ?? user?.userMetadata?['full_name'] ?? email.split('@').first;
     final String initials = name.isNotEmpty
         ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
         : 'BP';
@@ -123,56 +122,44 @@ class _ProfileTabState extends State<ProfileTab> {
       physics: const BouncingScrollPhysics(),
       child: Column(
         children: [
-          // Header card
           _buildProfileHeader(name, email, initials, scale),
-
           SizedBox(height: 16 * scale),
-
-          // Menu sections
           _buildSection(
             'Account',
             [
-              _MenuItem(Icons.person_outline_rounded,    'Edit Profile',        false),
-              _MenuItem(Icons.location_on_outlined,      'Saved Addresses',     false),
+              _MenuItem(Icons.person_outline_rounded, 'Edit Profile', false),
+              _MenuItem(Icons.location_on_outlined, 'Saved Addresses', false),
             ],
             scale,
             context,
             theme,
             isDark,
           ),
-
           SizedBox(height: 16 * scale),
-
           _buildSection(
             'Preferences',
             [
-              _MenuItem(Icons.notifications_none_rounded, 'Notifications',     false),
-              _MenuItem(Icons.language_rounded,            'Language',          false),
+              _MenuItem(Icons.notifications_none_rounded, 'Notifications', false),
             ],
             scale,
             context,
             theme,
             isDark,
           ),
-
           SizedBox(height: 16 * scale),
-
           _buildSection(
             'Support',
             [
-              _MenuItem(Icons.help_outline_rounded,        'Help & FAQ',        false),
-              _MenuItem(Icons.privacy_tip_outlined,        'Privacy Policy',    false),
-              _MenuItem(Icons.star_outline_rounded,        'Rate the App',      false),
+              _MenuItem(Icons.help_outline_rounded, 'Help & FAQ', false),
+              _MenuItem(Icons.privacy_tip_outlined, 'Privacy Policy', false),
+              _MenuItem(Icons.star_outline_rounded, 'Rate the App', false),
             ],
             scale,
             context,
             theme,
             isDark,
           ),
-
           SizedBox(height: 16 * scale),
-
-          // Sign out
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16 * scale),
             child: GestureDetector(
@@ -183,14 +170,12 @@ class _ProfileTabState extends State<ProfileTab> {
                 decoration: BoxDecoration(
                   color: Colors.red.withAlpha(18),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: Colors.red.withAlpha(64), width: 1),
+                  border: Border.all(color: Colors.red.withAlpha(64), width: 1),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.logout_rounded,
-                        color: Colors.red[400], size: 20 * scale),
+                    Icon(Icons.logout_rounded, color: Colors.red[400], size: 20 * scale),
                     SizedBox(width: 8 * scale),
                     Text(
                       'Sign Out',
@@ -205,10 +190,7 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
           ),
-
           SizedBox(height: 16 * scale),
-
-          // App version
           Text(
             'Bobu Pizza v1.0.0',
             style: GoogleFonts.poppins(
@@ -216,15 +198,13 @@ class _ProfileTabState extends State<ProfileTab> {
               color: isDark ? Colors.white30 : const Color(0xFF2D1A0E).withAlpha(76),
             ),
           ),
-
-          SizedBox(height: 120 * scale), // Space for floating nav bar
+          SizedBox(height: 120 * scale),
         ],
       ),
     );
   }
 
-  Widget _buildProfileHeader(
-      String name, String email, String initials, double scale) {
+  Widget _buildProfileHeader(String name, String email, String initials, double scale) {
     return Container(
       width: double.infinity,
       margin: EdgeInsets.all(16 * scale),
@@ -246,15 +226,13 @@ class _ProfileTabState extends State<ProfileTab> {
       ),
       child: Row(
         children: [
-          // Avatar
           Container(
             width: 64 * scale,
             height: 64 * scale,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
-              border: Border.all(
-                  color: Colors.white.withOpacity(0.5), width: 2),
+              border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
             ),
             child: Center(
               child: Text(
@@ -268,8 +246,6 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
           ),
           SizedBox(width: 16 * scale),
-
-          // Name + email
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,8 +272,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
                 SizedBox(height: 8 * scale),
                 Container(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 10 * scale, vertical: 4 * scale),
+                  padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -319,8 +294,7 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildSection(String title, List<_MenuItem> items,
-      double scale, BuildContext context, ThemeData theme, bool isDark) {
+  Widget _buildSection(String title, List<_MenuItem> items, double scale, BuildContext context, ThemeData theme, bool isDark) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16 * scale),
       child: Column(
@@ -358,7 +332,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 return Column(
                   children: [
                     GestureDetector(
-                        onTap: () async {
+                      onTap: () async {
                         if (item.label == 'Saved Addresses') {
                           Navigator.pushNamed(context, '/addresses');
                         } else if (item.label == 'Edit Profile') {
@@ -366,6 +340,8 @@ class _ProfileTabState extends State<ProfileTab> {
                           if (result == true) {
                             _fetchProfile();
                           }
+                        } else if (item.label == 'Notifications') {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen()));
                         } else if (item.label == 'Help & FAQ') {
                           Navigator.pushNamed(context, '/help-faq');
                         } else if (item.label == 'Privacy Policy') {
@@ -376,9 +352,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       },
                       behavior: HitTestBehavior.opaque,
                       child: Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 16 * scale,
-                            vertical: 14 * scale),
+                        padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 14 * scale),
                         child: Row(
                           children: [
                             Container(
@@ -388,9 +362,7 @@ class _ProfileTabState extends State<ProfileTab> {
                                 color: AppColors.primary.withOpacity(0.08),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(item.icon,
-                                  color: AppColors.primary,
-                                  size: 18 * scale),
+                              child: Icon(item.icon, color: AppColors.primary, size: 18 * scale),
                             ),
                             SizedBox(width: 14 * scale),
                             Expanded(
@@ -405,8 +377,7 @@ class _ProfileTabState extends State<ProfileTab> {
                             ),
                             Icon(
                               Icons.chevron_right_rounded,
-                              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E)
-                                  .withValues(alpha: 0.3),
+                              color: isDark ? Colors.white24 : const Color(0xFF2D1A0E).withOpacity(0.3),
                               size: 20 * scale,
                             ),
                           ],

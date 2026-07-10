@@ -49,7 +49,7 @@ class MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   late Animation<double> _pulseScale;
   int _prevItemCount = 0;
 
-  final List<_NavItem> _navItems = const [
+  List<_NavItem> get _navItems => [
     _NavItem(icon: Icons.home_outlined,         activeIcon: Icons.home_rounded,         label: 'Home'),
     _NavItem(icon: Icons.grid_view_outlined,    activeIcon: Icons.grid_view_rounded,    label: 'Menu'),
     _NavItem(icon: Icons.shopping_bag_outlined, activeIcon: Icons.shopping_bag_rounded, label: 'Cart'),
@@ -64,8 +64,6 @@ class MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _initAnimations();
     CartService.cartItemsNotifier.addListener(_onCartChanged);
     CartService.fetchCartFromDb();
-    
-    // Ensure order status listener is active whenever MainScreen is shown
     NotificationService.listenToOrderStatus();
   }
 
@@ -205,7 +203,6 @@ class MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Force correct overlay style based on current theme brightness
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
@@ -271,7 +268,6 @@ class MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         margin: const EdgeInsets.symmetric(horizontal: _navBarHorizontalMargin),
         decoration: BoxDecoration(
           borderRadius: navBr,
-          // Outer shadow gives floating feel without any card look
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(isDark ? 50 : 20),
@@ -284,35 +280,25 @@ class MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           borderRadius: navBr,
           child: Stack(
             children: [
-              // ── [0] BLUR ONLY — child is 100% transparent ──
-              // This is the only correct way. Any color here = opaque glass.
               BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-                child: const SizedBox.expand(), // ← TRANSPARENT, NO COLOR
+                child: const SizedBox.expand(),
               ),
-
-              // ── [1] TINT — separate layer, ultra low opacity ──
-              // Light mode: just a whisper of white so icons are readable
-              // Dark mode: even less — almost nothing
               Container(
                 color: isDark
-                    ? Colors.white.withAlpha(12)  // ~5%
-                    : Colors.white.withAlpha(20), // ~8% — crystal clear
+                    ? Colors.white.withAlpha(12)
+                    : Colors.white.withAlpha(20),
               ),
-
-              // ── [2] Border only ──
               DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: navBr,
                   border: Border.all(
-                    color: AppColors.primary.withAlpha(120), // Added red border
+                    color: AppColors.primary.withAlpha(120),
                     width: 1.2,
                   ),
                 ),
                 child: const SizedBox.expand(),
               ),
-
-              // ── [3] Liquid pill ──
               AnimatedBuilder(
                 animation: _pillController,
                 builder: (context, _) {
@@ -333,8 +319,6 @@ class MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                   );
                 },
               ),
-
-              // ── [4] Icons ──
               Row(
                 children: List.generate(_navItems.length, (index) {
                   final item = _navItems[index];
@@ -480,13 +464,10 @@ class _LiquidPill extends StatelessWidget {
         height: height,
         child: Stack(
           children: [
-            // Blur — transparent child
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: const SizedBox.expand(),
             ),
-
-            // Brand tint — low opacity so pill is glassy not filled
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -504,8 +485,6 @@ class _LiquidPill extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Border
             DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: br,
@@ -516,8 +495,6 @@ class _LiquidPill extends StatelessWidget {
               ),
               child: const SizedBox.expand(),
             ),
-
-            // Top specular streak
             Positioned(
               top: 2,
               left: width * 0.25,

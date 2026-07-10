@@ -106,7 +106,7 @@ class _CartTabState extends State<CartTab> {
             'Add some delicious pizzas!',
             style: GoogleFonts.poppins(
               fontSize: 13 * scale,
-              color: isDark ? Colors.white38 : const Color(0xFF2D1A0E).withAlpha(115),
+              color: isDark ? Colors.white.withAlpha(97) : const Color(0xFF2D1A0E).withAlpha(115),
             ),
           ),
         ],
@@ -120,12 +120,12 @@ class _CartTabState extends State<CartTab> {
       margin: EdgeInsets.only(bottom: 12 * scale),
       padding: EdgeInsets.all(12 * scale),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withAlpha(13) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8D5C0), width: 1),
         boxShadow: isDark ? [] : [
           BoxShadow(
-            color: const Color(0xFF2D1A0E).withOpacity(0.05),
+            color: const Color(0xFF2D1A0E).withAlpha(13),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -138,7 +138,7 @@ class _CartTabState extends State<CartTab> {
             width: 64 * scale,
             height: 64 * scale,
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
+              color: isDark ? Colors.white.withAlpha(5) : const Color(0xFFFFF0DC),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(

@@ -21,7 +21,6 @@ class _MenuTabState extends State<MenuTab> {
   List<CategoryModel> _categories = [];
   List<Pizza> _allItems = [];
 
-  // Search state
   final TextEditingController _searchController = TextEditingController();
   bool _isSearchActive = false;
   bool _isSearching = false;
@@ -39,17 +38,13 @@ class _MenuTabState extends State<MenuTab> {
   final int _pageSize = 10;
   final ScrollController _scrollController = ScrollController();
 
-  // ── Sidebar wheel controller ──
   late final FixedExtentScrollController _wheelController =
   FixedExtentScrollController(initialItem: _selectedCategoryIndex);
 
-  // True while a tap-triggered animateToItem is running.
-  // Prevents intermediate pass-through items from firing loads/haptics.
   bool _isProgrammaticScroll = false;
 
-  // ── Fixed sizes — sidebar looks identical everywhere ──
-  static const double _sidebarWidth = 92.0; // Increased width slightly
-  static const double _itemHeight = 82.0; // Increased height to fit 2 lines comfortably
+  static const double _sidebarWidth = 92.0;
+  static const double _itemHeight = 82.0;
 
   @override
   void initState() {
@@ -127,7 +122,6 @@ class _MenuTabState extends State<MenuTab> {
 
     setState(() {
       _isCategoryLoading = true;
-      _isMoreLoading = false; // Reset more loading flag
       _allItems = [];
     });
 
@@ -180,7 +174,6 @@ class _MenuTabState extends State<MenuTab> {
             _isMoreLoading = false;
           });
         } else {
-          // If category changed while loading, just reset the flag
           _isMoreLoading = false;
         }
       }
@@ -197,16 +190,11 @@ class _MenuTabState extends State<MenuTab> {
     }
   }
 
-  /// Called when the user TAPS a category (may be far away, e.g. 1 → 4).
-  /// Animates the wheel smoothly through all intermediate items without
-  /// triggering loads/haptics for each one it passes.
   Future<void> _onCategoryTapped(int index) async {
     if (index < 0 || index >= _categories.length) return;
     if (index == _selectedCategoryIndex) return;
 
     final int distance = (index - _selectedCategoryIndex).abs();
-    // Slightly longer duration for longer jumps so it still feels natural,
-    // capped so it never feels sluggish.
     final int durationMs = (320 + distance * 55).clamp(320, 700);
 
     HapticFeedback.selectionClick();
@@ -226,8 +214,6 @@ class _MenuTabState extends State<MenuTab> {
     _loadCategoryItems(index);
   }
 
-  /// Called when the user physically DRAGS the wheel and it settles on
-  /// a new item. Ignored while a tap-triggered animation is in progress.
   void _onWheelSelectedItemChanged(int index) {
     if (_isProgrammaticScroll) return;
     if (index == _selectedCategoryIndex) return;
@@ -259,7 +245,6 @@ class _MenuTabState extends State<MenuTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header ──
           Padding(
             padding: EdgeInsets.fromLTRB(20 * scale, 16 * scale, 16 * scale, 12 * scale),
             child: AnimatedSwitcher(
@@ -290,21 +275,18 @@ class _MenuTabState extends State<MenuTab> {
           Expanded(
             child: Stack(
               children: [
-                // ── Right Content ──
                 Row(
                   children: [
-                    const SizedBox(width: _sidebarWidth + 24), // Offset for floating sidebar
+                    const SizedBox(width: _sidebarWidth + 24),
                     Expanded(
                       child: _isSearchActive ? _buildSearchResults(scale, isDark) : _buildCategoryItems(scale, isDark),
                     ),
                   ],
                 ),
-
-                // ── Left Sidebar (Floating Capsule) ──
                 Positioned(
                   top: 0,
                   left: 12 * scale,
-                  bottom: 85 * scale, // Sits just above the main navbar
+                  bottom: 85 * scale,
                   child: _buildSidebar(isDark, scale),
                 ),
               ],
@@ -321,9 +303,9 @@ class _MenuTabState extends State<MenuTab> {
       height: 48 * scale,
       padding: const EdgeInsets.only(left: 4),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.8),
+        color: isDark ? Colors.white.withAlpha(13) : Colors.white.withAlpha(204),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withAlpha(76)),
       ),
       child: TextField(
         controller: _searchController,
@@ -331,7 +313,7 @@ class _MenuTabState extends State<MenuTab> {
         onChanged: _onSearchChanged,
         style: GoogleFonts.poppins(fontSize: 14 * scale, color: isDark ? Colors.white : Colors.black),
         decoration: InputDecoration(
-          hintText: 'Search for burgers, breads...',
+          hintText: 'Search pizzas...',
           hintStyle: GoogleFonts.poppins(fontSize: 13 * scale, color: isDark ? Colors.white38 : Colors.grey),
           prefixIcon: Icon(Icons.search_rounded, color: AppColors.primary, size: 20 * scale),
           suffixIcon: IconButton(
@@ -433,9 +415,6 @@ class _MenuTabState extends State<MenuTab> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────
-  // Sidebar — Floating Capsule, centered pill, ultra-smooth drag wheel
-  // ─────────────────────────────────────────────────────────
   Widget _buildSidebar(bool isDark, double scale) {
     final BorderRadius capsuleRadius = BorderRadius.circular(40 * scale);
 
@@ -444,7 +423,7 @@ class _MenuTabState extends State<MenuTab> {
       decoration: BoxDecoration(
         borderRadius: capsuleRadius,
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.3), // Reddish border for capsule
+          color: AppColors.primary.withAlpha(76),
           width: 1.2,
         ),
       ),
@@ -452,17 +431,14 @@ class _MenuTabState extends State<MenuTab> {
         borderRadius: capsuleRadius,
         child: Stack(
           children: [
-            // Glass Background
             Positioned.fill(
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
-                  color: isDark ? Colors.white.withOpacity(0.04) : Colors.white.withOpacity(0.45),
+                  color: isDark ? Colors.white.withAlpha(10) : Colors.white.withAlpha(115),
                 ),
               ),
             ),
-
-            // Fixed, perfectly centered highlight pill
             Align(
               alignment: Alignment.center,
               child: Container(
@@ -473,22 +449,21 @@ class _MenuTabState extends State<MenuTab> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      AppColors.primary.withOpacity(isDark ? 0.25 : 0.16),
-                      AppColors.primary.withOpacity(isDark ? 0.10 : 0.06),
+                      AppColors.primary.withAlpha(isDark ? 64 : 41),
+                      AppColors.primary.withAlpha(isDark ? 26 : 15),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.2),
+                  border: Border.all(color: AppColors.primary.withAlpha(102), width: 1.2),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.2),
+                      color: AppColors.primary.withAlpha(51),
                       blurRadius: 15,
                     ),
                   ],
                 ),
               ),
             ),
-
             ListWheelScrollView.useDelegate(
               controller: _wheelController,
               itemExtent: _itemHeight,
@@ -531,7 +506,7 @@ class _MenuTabState extends State<MenuTab> {
                                   ),
                                   const SizedBox(height: 4),
                                   SizedBox(
-                                    width: _sidebarWidth - 28, // Forces text to wrap before hitting red box edge
+                                    width: _sidebarWidth - 28,
                                     child: Text(
                                       _categories[index].name,
                                       textAlign: TextAlign.center,
@@ -539,7 +514,7 @@ class _MenuTabState extends State<MenuTab> {
                                       softWrap: true,
                                       style: GoogleFonts.poppins(
                                         fontSize: 9,
-                                        height: 1.0, // Tighter line height for 2-line text
+                                        height: 1.0,
                                         fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                                         color: isActive
                                             ? AppColors.primary
@@ -569,9 +544,9 @@ class _MenuTabState extends State<MenuTab> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('🍕', style: TextStyle(fontSize: 40)),
+          const Text('🍕', style: TextStyle(fontSize: 40)),
           const SizedBox(height: 12),
-          Text('No items found', style: GoogleFonts.poppins(color: isDark ? Colors.white54 : Colors.grey)),
+          Text('No pizzas found', style: GoogleFonts.poppins(color: isDark ? Colors.white54 : Colors.grey)),
         ],
       ),
     );
@@ -580,14 +555,14 @@ class _MenuTabState extends State<MenuTab> {
   Widget _buildCompactMenuCard(Pizza item, double scale, bool isDark) {
     return Container(
       margin: EdgeInsets.only(bottom: 16 * scale),
-      padding: EdgeInsets.all(10 * scale), // Reduced padding
+      padding: EdgeInsets.all(10 * scale),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        color: isDark ? Colors.white.withAlpha(13) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!, width: 1),
         boxShadow: isDark ? [] : [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withAlpha(8),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -599,10 +574,10 @@ class _MenuTabState extends State<MenuTab> {
           Stack(
             children: [
               Container(
-                width: 85 * scale, // Optimized width
-                height: 85 * scale, // Optimized height
+                width: 85 * scale,
+                height: 85 * scale,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
+                  color: isDark ? Colors.white.withAlpha(5) : const Color(0xFFFFF0DC),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: ClipRRect(
@@ -705,7 +680,7 @@ class _MenuTabState extends State<MenuTab> {
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : const Color(0xFF2D1A0E),
                   ),
-                  maxLines: 1, // Changed to 1 line to save vertical space
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
@@ -756,7 +731,7 @@ class _MenuTabState extends State<MenuTab> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                         ),
                         child: Text(
-                          item.category == 'BOBU Deals' ? 'SELECT' : 'ADD', 
+                          item.category == 'BOBU Deals' ? 'SELECT' : 'ADD',
                           style: GoogleFonts.poppins(fontSize: 10 * scale, fontWeight: FontWeight.bold)
                         ),
                       ),
@@ -783,10 +758,8 @@ class _MenuTabState extends State<MenuTab> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Calculate price based on size and addons
             double currentUnitPrice = item.getPriceForSize(selectedSize ?? '');
             
-            // Addon logic
             final bool isBobu = item.category.toLowerCase().contains('bobu');
             final String size = selectedSize?.toLowerCase() ?? 'small';
 
@@ -822,12 +795,11 @@ class _MenuTabState extends State<MenuTab> {
                           width: double.infinity,
                           height: 300 * scale,
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFFFF0DC),
+                            color: isDark ? Colors.white.withAlpha(5) : const Color(0xFFFFF0DC),
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                           ),
                           child: Stack(
                             children: [
-                              // Full Image with Cover fit
                               Positioned.fill(
                                 child: ClipRRect(
                                   borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -852,7 +824,6 @@ class _MenuTabState extends State<MenuTab> {
                                   ),
                                 ),
                               ),
-                              // Close Button
                               Positioned(
                                 top: 20 * scale,
                                 right: 20 * scale,
@@ -865,7 +836,6 @@ class _MenuTabState extends State<MenuTab> {
                                   ),
                                 ),
                               ),
-                              // Tags Container
                               Positioned(
                                 top: 20 * scale,
                                 left: 20 * scale,
@@ -939,7 +909,7 @@ class _MenuTabState extends State<MenuTab> {
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                                    decoration: BoxDecoration(color: Colors.amber.withAlpha(26), borderRadius: BorderRadius.circular(12)),
                                     child: Row(
                                       children: [
                                         const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
@@ -951,8 +921,6 @@ class _MenuTabState extends State<MenuTab> {
                                 ],
                               ),
                               SizedBox(height: 16 * scale),
-                              
-                              // ── Size Selection ──
                               if (item.sizes != null && item.sizes!.isNotEmpty) ...[
                                 Text('Select Size', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                 SizedBox(height: 12 * scale),
@@ -966,7 +934,7 @@ class _MenuTabState extends State<MenuTab> {
                                         margin: EdgeInsets.only(right: 12 * scale),
                                         padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 10 * scale),
                                         decoration: BoxDecoration(
-                                          color: isSelected ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100]),
+                                          color: isSelected ? AppColors.primary : (isDark ? Colors.white.withAlpha(13) : Colors.grey[100]),
                                           borderRadius: BorderRadius.circular(12),
                                           border: Border.all(color: isSelected ? AppColors.primary : (isDark ? Colors.white10 : Colors.transparent)),
                                         ),
@@ -985,7 +953,6 @@ class _MenuTabState extends State<MenuTab> {
                                 SizedBox(height: 24 * scale),
                               ],
 
-                              // ── Add-ons Selection ──
                               if (item.category.contains('Pizza')) ...[
                                 Text('Add Extras', style: GoogleFonts.poppins(fontSize: 16 * scale, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                 SizedBox(height: 12 * scale),
@@ -1019,7 +986,7 @@ class _MenuTabState extends State<MenuTab> {
                                       margin: EdgeInsets.only(bottom: 10 * scale),
                                       padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
                                       decoration: BoxDecoration(
-                                        color: isSelected ? AppColors.primary.withOpacity(0.1) : (isDark ? Colors.white.withOpacity(0.02) : Colors.grey[50]),
+                                        color: isSelected ? AppColors.primary.withAlpha(26) : (isDark ? Colors.white.withAlpha(5) : Colors.grey[50]),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(color: isSelected ? AppColors.primary : (isDark ? Colors.white10 : Colors.grey[200]!)),
                                       ),
@@ -1075,7 +1042,7 @@ class _MenuTabState extends State<MenuTab> {
                       padding: EdgeInsets.all(24 * scale),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
+                        boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 20, offset: const Offset(0, -5))],
                       ),
                       child: Row(
                         children: [
@@ -1232,8 +1199,8 @@ class _MenuTabState extends State<MenuTab> {
                                 padding: EdgeInsets.all(12 * scale),
                                 decoration: BoxDecoration(
                                   color: count > 0 
-                                    ? AppColors.primary.withOpacity(0.08) 
-                                    : (isDark ? Colors.white.withOpacity(0.03) : Colors.grey[50]),
+                                    ? AppColors.primary.withAlpha(20) 
+                                    : (isDark ? Colors.white.withAlpha(8) : Colors.grey[50]),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: count > 0 ? AppColors.primary : (isDark ? Colors.white10 : Colors.grey[200]!),
@@ -1281,7 +1248,7 @@ class _MenuTabState extends State<MenuTab> {
                     padding: EdgeInsets.all(24 * scale),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
+                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 20, offset: const Offset(0, -5))],
                     ),
                     child: Row(
                       children: [
@@ -1346,7 +1313,7 @@ class _MenuTabState extends State<MenuTab> {
           Container(
             height: 60 * scale,
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+              color: isDark ? Colors.white.withAlpha(13) : Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: pizza != null ? AppColors.primary : (isDark ? Colors.white10 : Colors.grey[200]!)),
             ),
@@ -1384,7 +1351,7 @@ class _MenuTabState extends State<MenuTab> {
                     shape: BoxShape.circle,
                     border: Border.all(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, width: 2),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))
+                      BoxShadow(color: Colors.black.withAlpha(51), blurRadius: 4, offset: const Offset(0, 2))
                     ]
                   ),
                   child: const Icon(Icons.close, color: Colors.white, size: 10),

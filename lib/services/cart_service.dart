@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:convert';
 import '../models/cart_item_model.dart';
 import '../models/pizza_model.dart';
 import 'supabase_service.dart';
@@ -11,7 +10,6 @@ class CartService {
 
   static List<CartItem> get items => cartItemsNotifier.value;
 
-  // Sync with Supabase on Login/App Start
   static Future<void> fetchCartFromDb() async {
     final user = client.auth.currentUser;
     if (user == null) return;
@@ -30,6 +28,7 @@ class CartService {
         }
 
         return CartItem(
+          id: item['id'].toString(), // Row ID fetch kar rahe hain
           pizza: Pizza.fromJson(item['pizzas']),
           quantity: item['quantity'],
           selectedSize: item['selected_size'],
@@ -49,7 +48,6 @@ class CartService {
 
     final currentItems = List<CartItem>.from(cartItemsNotifier.value);
     
-    // Check if same pizza + size + addons exists
     final existingIndex = currentItems.indexWhere((item) {
       bool samePizza = item.pizza.id == pizza.id;
       bool sameSize = item.selectedSize == size;
@@ -60,23 +58,32 @@ class CartService {
     try {
       await SupabaseService.checkConnectivity();
       if (existingIndex != -1) {
-        currentItems[existingIndex].quantity += quantity;
+        final item = currentItems[existingIndex];
+        final newQty = item.quantity + quantity;
+        
         await client
             .from('cart_items')
-            .update({'quantity': currentItems[existingIndex].quantity})
-            .eq('user_id', user.id)
-            .eq('pizza_id', pizza.id)
-            .eq('selected_size', size ?? '')
-            .filter('selected_addons', 'cs', jsonEncode(addons));
+            .update({'quantity': newQty})
+            .eq('id', item.id!); // ID se update
+            
+        currentItems[existingIndex].quantity = newQty;
       } else {
-        currentItems.add(CartItem(pizza: pizza, quantity: quantity, selectedSize: size, selectedAddons: addons));
-        await client.from('cart_items').insert({
+        // Naya item insert karke uska ID le rahe hain
+        final response = await client.from('cart_items').insert({
           'user_id': user.id,
           'pizza_id': pizza.id,
           'quantity': quantity,
           'selected_size': size,
           'selected_addons': addons,
-        });
+        }).select().single();
+
+        currentItems.add(CartItem(
+          id: response['id'].toString(),
+          pizza: pizza, 
+          quantity: quantity, 
+          selectedSize: size, 
+          selectedAddons: addons
+        ));
       }
       cartItemsNotifier.value = currentItems;
     } catch (e) {
@@ -97,26 +104,20 @@ class CartService {
     });
 
     if (index != -1) {
-      final newQty = currentItems[index].quantity + delta;
+      final item = currentItems[index];
+      final newQty = item.quantity + delta;
       
       try {
         await SupabaseService.checkConnectivity();
         if (newQty <= 0) {
+          // Exact ID se delete kar rahe hain, koi error nahi aayega
+          await client.from('cart_items').delete().eq('id', item.id!);
           currentItems.removeAt(index);
-          await client.from('cart_items')
-              .delete()
-              .eq('user_id', user.id)
-              .eq('pizza_id', pizzaId)
-              .eq('selected_size', size ?? '')
-              .filter('selected_addons', 'cs', jsonEncode(addons));
         } else {
-          currentItems[index].quantity = newQty;
           await client.from('cart_items')
               .update({'quantity': newQty})
-              .eq('user_id', user.id)
-              .eq('pizza_id', pizzaId)
-              .eq('selected_size', size ?? '')
-              .filter('selected_addons', 'cs', jsonEncode(addons));
+              .eq('id', item.id!); // ID se update
+          currentItems[index].quantity = newQty;
         }
         cartItemsNotifier.value = currentItems;
       } catch (e) {
